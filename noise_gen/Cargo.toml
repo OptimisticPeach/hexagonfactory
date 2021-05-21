@@ -1,0 +1,13 @@
+[package]
+name = "noise_gen"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+simdnoise = "3.1.6"
+simdeez = "1.0.7"
+bevy = { path = "../../bevy" }
+rayon = "1.5.1"
+arrayvec = "0.7.0"
