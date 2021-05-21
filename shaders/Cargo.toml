@@ -1,0 +1,33 @@
+[package]
+name = "shaders"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+#bevy_app = { git = "https://github.com/bevyengine/bevy.git" }
+#bevy_asset = { git = "https://github.com/bevyengine/bevy.git" }
+#bevy_core = { git = "https://github.com/bevyengine/bevy.git" }
+#bevy_derive = { git = "https://github.com/bevyengine/bevy.git" }
+#bevy_ecs = { git = "https://github.com/bevyengine/bevy.git" }
+#bevy_math = { git = "https://github.com/bevyengine/bevy.git" }
+#bevy_reflect = { git = "https://github.com/bevyengine/bevy.git", features = ["bevy"] }
+#bevy_render = { git = "https://github.com/bevyengine/bevy.git" }
+#bevy_transform = { git = "https://github.com/bevyengine/bevy.git" }
+#bevy_window = { git = "https://github.com/bevyengine/bevy.git" }
+#bevy_pbr = { git = "https://github.com/bevyengine/bevy.git" }
+
+#bevy_app = { path = "../../bevy/crates/bevy_app" }
+#bevy_asset = { path = "../../bevy/crates/bevy_asset" }
+#bevy_core = { path = "../../bevy/crates/bevy_core" }
+#bevy_derive = { path = "../../bevy/crates/bevy_derive" }
+#bevy_ecs = { path = "../../bevy/crates/bevy_ecs" }
+#bevy_math = { path = "../../bevy/crates/bevy_math" }
+#bevy_reflect = { path = "../../bevy/crates/bevy_reflect", features = ["bevy"] }
+#bevy_render = { path = "../../bevy/crates/bevy_render" }
+#bevy_transform = { path = "../../bevy/crates/bevy_transform" }
+#bevy_window = { path = "../../bevy/crates/bevy_window" }
+#bevy_pbr = { path = "../../bevy/crates/bevy_pbr" }
+
+bevy = { path = "../../bevy" }
