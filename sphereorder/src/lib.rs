@@ -3,22 +3,28 @@ use petgraph::Graph;
 use bevy::ecs::entity::Entity;
 use bevy::math::{Vec3, Quat, Mat4};
 use shaders::PerFaceData;
-use bevy::ecs::system::Commands;
+use bevy::ecs::system::{Commands, Query, ResMut, IntoSystem};
 use arrayvec::ArrayVec;
 use bevy::math::Vec3A;
-use bevy::render::mesh::{Indices, Mesh};
+use bevy::render::mesh::{Indices, Mesh, VertexAttributeValues};
 use bevy::render::pipeline::PrimitiveTopology;
 use bevy::utils::{HashMap, HashSet};
 use hexasphere::shapes::IcoSphere;
 
 use parking_lot::RwLock;
 use std::sync::Arc;
-use bevy::transform::components::{Transform, GlobalTransform};
+use bevy::transform::components::{Transform, GlobalTransform, Parent};
 use bevy::transform::hierarchy::BuildChildren;
 
 use rand::Rng;
+use bevy::app::{Plugin, AppBuilder};
+use bevy::ecs::query::Changed;
+use bevy::asset::{Assets, Handle};
 
 mod biome;
+pub mod board_ops;
+
+pub use board_ops::BoardPlugin;
 
 pub struct ChunkData {
     pub vector: Vec3,
@@ -29,7 +35,14 @@ pub struct BoardMember {
     pub board: Arc<BoardGraph>,
     pub graph_idx: NodeIndex,
     pub data_idx: usize,
+    pub face_idx: usize,
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct FaceMaterialIdx(pub i32);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct OldFaceMaterialIdx(pub i32);
 
 #[derive(Copy, Clone, Hash, PartialEq, Debug)]
 pub struct TileLayers {
@@ -40,11 +53,8 @@ pub struct TileLayers {
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct TileData {
     pub layers: TileLayers,
-    pub height: f32,
-    pub local_slope: f32,
-    pub wetness: f32,
+    pub biome: crate::biome::Biome,
     pub temperature: f32,
-    pub face_index: usize,
 }
 
 pub struct BoardGraph {
@@ -56,28 +66,26 @@ pub struct BoardGraph {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct NoiseParameters {
-
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct GeographicalParams {
-    height_seed: i32,
-    wet_seed: i32,
-    temp_seed: i32,
+    pub metal_seed: i32,
+    pub temp_seed: i32,
+}
+
+pub struct BoardInitialization {
+    board_type: BoardInitializationType,
+    subdivisions: u32,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum BoardInitialization {
+pub enum BoardInitializationType {
     Empty,
-    FullFlat,
     Base(GeographicalParams),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct BoardBuilder {
     subdivisions: usize,
-    state: BoardInitialization,
+    state: BoardInitializationType,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Hash)]
@@ -183,7 +191,7 @@ impl BoardBuilder {
         let board = commands.spawn().id();
 
         let sphere = IcoSphere::new(self.subdivisions, |_| ());
-        let original_points = sphere.raw_points().clone();
+        let original_points = sphere.raw_points();
         // Keep the middle points and the between-points separate
         // since we only need most of the tile parameters for the
         // middle points. All points need a
@@ -232,9 +240,6 @@ impl BoardBuilder {
         // Center id to node index.
         let mut old_center_to_node = HashMap::default();
 
-        // Counter which represents the current tile idx
-        let mut tile_idx = 0;
-
         for chunk in 0..20 {
             index_buffer.clear();
             sphere.get_indices(chunk, &mut index_buffer);
@@ -262,8 +267,8 @@ impl BoardBuilder {
 
             // For every full hexagon we get...
             for (old_center, mut sides) in inner {
-                let node = cumulative_graph.add_node(tile_idx);
-                tile_idx += 1;
+                let center = mid_points.len();
+                let node = cumulative_graph.add_node(center);
                 old_center_to_node.insert(old_center, node);
                 assert_eq!(sides.len(), 6);
 
@@ -290,7 +295,6 @@ impl BoardBuilder {
 
                 chunk_normal += avg;
 
-                let center = mid_points.len();
                 mid_points.push(avg);
 
                 let mut iter = ordered_points.iter().copied().peekable();
@@ -301,13 +305,12 @@ impl BoardBuilder {
                     temp_out_indices.extend_from_slice(&[Mid(center as u32), All(a as u32), All(b as u32)]);
                 }
 
-                mid_face_indices.push(0);
-                
-                let entity = commands.spawn().insert_bundle(
-                    (
-                        GlobalTransform::default(),
-                    )
-                ).id();
+                mid_face_indices.push(1);
+
+                let entity = commands
+                    .spawn()
+                    .insert(GlobalTransform::default())
+                    .id();
 
                 commands
                     .entity(board.clone())
@@ -321,7 +324,7 @@ impl BoardBuilder {
                         node,
                         // The per-face index which tells us the
                         // which material to index later.
-                        mid_face_indices.len() - 1,
+                        center,
                     )
                 );
             }
@@ -343,8 +346,8 @@ impl BoardBuilder {
             chunk_tile_data.push(Vec::new());
 
             for (old_center, mut sides) in edge_chunk_surrounding_points {
-                let node = cumulative_graph.add_node(tile_idx);
-                tile_idx += 1;
+                let center = mid_points.len();
+                let node = cumulative_graph.add_node(center);
                 old_center_to_node.insert(old_center, node);
 
                 let mut ordered_points = ArrayVec::<usize, 6>::new();
@@ -368,7 +371,6 @@ impl BoardBuilder {
                     .fold(Vec3A::ZERO, |prev, idx| prev + new_points[*idx])
                     .normalize();
 
-                let center = mid_points.len();
                 mid_points.push(avg);
 
                 let mut iter = ordered_points.iter().copied().peekable();
@@ -379,14 +381,16 @@ impl BoardBuilder {
                     temp_out_indices.extend_from_slice(&[Mid(center as u32), All(a as u32), All(b as u32)]);
                 }
 
-                mid_face_indices.push(0);
+                mid_face_indices.push(2);
 
-                let entity = commands.spawn().insert_bundle(
-                    (
-                        make_point_transform(avg),
-                        GlobalTransform::default(),
-                    )
-                ).id();
+                let entity = commands
+                    .spawn()
+                    .insert(GlobalTransform::default())
+                    .id();
+
+                commands
+                    .entity(board.clone())
+                    .push_children(&[entity]);
 
                 entities.push(
                     (
@@ -395,7 +399,7 @@ impl BoardBuilder {
                         // The node index
                         node,
                         // The per-face index which tells us
-                        mid_face_indices.len() - 1,
+                        center,
                     )
                 );
             }
@@ -409,121 +413,67 @@ impl BoardBuilder {
             );
         }
 
-        let geographical_parameters = if let BoardInitialization::Base(x) = self.state { x } else { panic!() };
-
-        let edges_heights = noise_gen::sample_all_noise(&new_points, [noise_gen::NoiseParameters {
-            scale: 0.5,
-            lac: 0.1,
-            bias: 0.1,
-            gain: 0.9,
-            seed: geographical_parameters.height_seed
-        }]);
-
-        new_points
-            .iter_mut()
-            .zip(edges_heights.into_iter())
-            .for_each(|(p, [scale])| *p *= 1.0 + scale);
+        let geographical_parameters = if let BoardInitializationType::Base(x) = self.state { x } else { panic!() };
 
         let mut tile_datas = noise_gen::sample_all_noise(&mid_points,
             [
-                // Height
+                // Whether it's dirt or metal
                 noise_gen::NoiseParameters {
                     scale: 0.5,
                     lac: 0.1,
-                    bias: 0.1,
                     gain: 0.9,
-                    seed: geographical_parameters.height_seed,
+                    min: 0.0,
+                    max: 1.0,
+                    seed: geographical_parameters.metal_seed,
                 },
-                // Wetness
+                // Whether it's terrain or lava
                 noise_gen::NoiseParameters {
                     scale: 1.0,
                     lac: 1.0,
-                    bias: 1.0,
                     gain: 1.0,
-                    seed: geographical_parameters.wet_seed,
-                },
-                // Temp
-                noise_gen::NoiseParameters {
-                    scale: 1.0,
-                    lac: 1.0,
-                    bias: 1.0,
-                    gain: 1.0,
+                    min: -1.0,
+                    max: 1.0,
                     seed: geographical_parameters.temp_seed,
                 },
             ]
         );
 
-        let slopes = {
-            let mut temp_neighbours = HashSet::default();
+        let biomes = crate::biome::make_biomes(&mut tile_datas);
 
-            // Apply new height while we're at it.
-            entities
-                .iter()
-                .enumerate()
-                .map(|(idx, (_ent, node, _))| {
-                    mid_points[idx] *= 1.0 + tile_datas[idx][0];
-
-                    temp_neighbours.insert(*node);
-                    cumulative_graph
-                        .neighbors_undirected(*node)
-                        .for_each(|x| {
-                            temp_neighbours.insert(x);
-                        });
-
-                    let mut min = f32::INFINITY;
-                    let mut max = f32::NEG_INFINITY;
-
-                    cumulative_graph
-                        .neighbors_undirected(*node)
-                        .for_each(|x| {
-                            cumulative_graph
-                                .neighbors_undirected(x)
-                                .for_each(|x| {
-                                    let idx = *cumulative_graph.node_weight(x).unwrap() as usize;
-                                    let height = tile_datas[idx][0];
-
-                                    min = min.min(height);
-                                    max = max.max(height);
-                                });
-                        });
-
-                    max - min
-                })
-                .collect::<Vec<_>>()
-        };
-
-        crate::biome::biome_generator::simulate_rules(&mut tile_datas, &slopes);
-        let biomes = crate::biome::biome_generator::make_biomes(&mut tile_datas, &slopes);
-
-        let per_face_data = crate::biome::biomes::BIOME_COLOURS.to_vec();
+        let per_face_data = crate::biome::BIOME_COLOURS.to_vec();
 
         let mut rng = rand::thread_rng();
-        let hmap = &*crate::biome::biomes::BIOME_MAP;
+        let hmap = &*crate::biome::BIOME_MAP;
 
         entities
             .iter()
+            .map(|x| x.0)
             .zip(biomes.into_iter())
-            .zip(tile_datas.into_iter().zip(slopes.into_iter()))
+            .zip(tile_datas.into_iter())
             .enumerate()
-            .for_each(|(idx, (((entity, _node, face_idx), biome), ([height, wet, temp], slope)))| {
-                mid_face_indices[*face_idx] = rng.gen_range(hmap.get(&biome).unwrap().clone());
+            .for_each(|(idx, ((entity, biome), [_metal, temp ]))| {
+                let biome_idx = rng.gen_range(hmap.get(&biome).unwrap().clone());
+                // mid_face_indices[*face_idx] = biome;
 
                 commands
-                    .entity(*entity)
-                    .insert(make_point_transform(mid_points[idx]));
+                    .entity(entity)
+                    .insert_bundle(
+                        (
+                            make_point_transform(mid_points[idx]),
+                            FaceMaterialIdx(biome_idx),
+                            OldFaceMaterialIdx(biome_idx),
+                        )
+                    );
 
                 let (chunk_idx, _) = idx_to_chunk(idx, per_chunk_len);
 
                 chunk_tile_data[chunk_idx].push(TileData {
                     layers: TileLayers {
-                        base: *entity,
+                        base: entity,
                         unit: None
                     },
-                    height,
-                    local_slope: slope,
-                    wetness: wet,
+                    biome,
                     temperature: temp,
-                    face_index: new_points.len() + idx
                 });
             });
 
@@ -544,16 +494,18 @@ impl BoardBuilder {
         );
 
         entities
-            .into_iter()
+            .iter()
             .enumerate()
-            .for_each(|(idx, (entity, node, _))| {
+            .for_each(|(idx, (entity, node, face_idx))| {
+                // mid_face_indices[idx] = 25;
                 commands
-                    .entity(entity)
+                    .entity(*entity)
                     .insert(
                         BoardMember {
                             board: total_board.clone(),
-                            graph_idx: node,
+                            graph_idx: *node,
                             data_idx: idx,
+                            face_idx: idx + per_face_indices.len()
                         }
                     );
             });
@@ -561,8 +513,16 @@ impl BoardBuilder {
         // Resolve real indices.
         let mid = new_points.len() as u32;
         let indices = temp_out_indices.into_iter().map(|x| x.resolve(mid)).collect::<Vec<_>>();
+        // let len = per_face_indices.len();
         new_points.extend(mid_points.into_iter());
         per_face_indices.extend(mid_face_indices.into_iter());
+
+        // entities
+        //     .iter()
+        //     .for_each(|(_, _, idx)| {
+        //         let &idx = idx;
+        //         per_face_indices[len + idx] = 4;
+        //     });
 
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
@@ -606,9 +566,8 @@ impl BoardGraph {
     pub fn build(subdivisions: usize) -> BoardBuilder {
         BoardBuilder {
             subdivisions,
-            state: BoardInitialization::Base(GeographicalParams {
-                height_seed: 10,
-                wet_seed: 20,
+            state: BoardInitializationType::Base(GeographicalParams {
+                metal_seed: 123,
                 temp_seed: 30,
             }),
         }

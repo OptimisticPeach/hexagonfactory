@@ -2,10 +2,10 @@ use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 
 use bevy::asset::LoadState;
-use bevy::render::mesh::{Indices, VertexAttributeValues};
+use bevy::render::mesh::Indices;
 use shaders::{LowPolyMaterial, LowPolyPBRBundle, LowPolyPBRPlugin};
 use rand::{thread_rng, Rng};
-use sphereorder::BoardMember;
+use sphereorder::{BoardMember, FaceMaterialIdx, OldFaceMaterialIdx};
 use arrayvec::ArrayVec;
 
 // mod geometry;
@@ -23,6 +23,7 @@ fn main() {
         .add_plugin(LowPolyPBRPlugin)
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin)
+        .add_plugin(sphereorder::BoardPlugin)
         .add_state(GameState::Load)
         .add_system_set(SystemSet::on_enter(GameState::Load).with_system(setup.system()))
         .add_system_set(
@@ -30,11 +31,12 @@ fn main() {
                 .with_system(poll_repeating_textures_load.system()),
         )
         .add_system_set(SystemSet::on_enter(GameState::Game)
-            .with_system(init_crawler.system())
+            // .with_system(init_crawler.system())
+            // .with_system(test_all.system())
         )
         .add_system_set(SystemSet::on_update(GameState::Game)
             .with_system(rotate.system())
-            .with_system(crawl.system())
+            // .with_system(crawl.system())
         )
         .run();
 }
@@ -72,81 +74,45 @@ fn poll_repeating_textures_load(
 
 struct CrawlerState {
     entity: Entity,
-    parent: Handle<Mesh>,
-    previous: i32,
+}
+
+fn test_all(
+    mut member: Query<(&mut FaceMaterialIdx, &BoardMember)>,
+) {
+    member
+        .iter_mut()
+        .for_each(|(mut x, member)| x.0 = 25);
 }
 
 fn init_crawler(
     mut crawler: ResMut<CrawlerState>,
     children: Query<&Children>,
-    member: Query<&BoardMember>,
-    meshes: Res<Assets<Mesh>>,
+    mut member: Query<&mut FaceMaterialIdx>,
 ) {
     let mut rng = thread_rng();
     let children = children.get(crawler.entity).unwrap();
     crawler.entity = children[rng.gen_range(0..children.len())];
 
-    let member = member
-        .get(crawler.entity)
+    let mut member = member
+        .get_mut(crawler.entity)
         .unwrap();
 
-    let data_idx = *member
-        .board
-        .total_graph
-        .node_weight(
-            member
-                .graph_idx
-        )
-        .unwrap();
-
-    let (chunk, per_chunk) = sphereorder::idx_to_chunk(data_idx, member.board.per_chunk);
-
-    let face_idx = member
-        .board
-        .tile_data[chunk]
-        .read()[per_chunk]
-        .face_index;
-
-    crawler.previous = meshes
-        .get(crawler.parent.clone())
-        .unwrap()
-        .attribute(shaders::ATTRIBUTE_PER_FACE_INDEX)
-        .map(|x| {
-            match x {
-                VertexAttributeValues::Sint32(v) => {
-                    v[face_idx]
-                }
-                _ => panic!(),
-            }
-        })
-        .unwrap();
+    member.0 = 25;
 }
 
 fn crawl(
     mut crawler: ResMut<CrawlerState>,
     member: Query<&BoardMember>,
-    mut meshes: ResMut<Assets<Mesh>>,
+    mut faces: Query<(&OldFaceMaterialIdx, &mut FaceMaterialIdx)>,
 ) {
+    // faces
+    //     .get_mut(crawler.entity)
+    //     .map(|(old, mut new)| new.0 = old.0)
+    //     .unwrap();
+
     let member = member
         .get(crawler.entity)
         .unwrap();
-
-    let data_idx = *member
-        .board
-        .total_graph
-        .node_weight(
-            member
-                .graph_idx
-        )
-        .unwrap();
-
-    let (chunk, per_chunk) = sphereorder::idx_to_chunk(data_idx, member.board.per_chunk);
-
-    let old_face_idx = member
-        .board
-        .tile_data[chunk]
-        .read()[per_chunk]
-        .face_index;
 
     let next = member
         .board
@@ -158,6 +124,7 @@ fn crawl(
         .collect::<ArrayVec<_, 6>>();
 
     let next = next[thread_rng().gen_range(0..next.len())];
+
     let (chunk, per_chunk) = sphereorder::idx_to_chunk(
         *member
             .board
@@ -169,37 +136,17 @@ fn crawl(
             .per_chunk,
     );
 
-    let (entity, face_idx) = {
-        let chunk_data = member
+    let entity = member
             .board
             .tile_data[chunk]
-            .read();
-
-        (
-            chunk_data[per_chunk]
-                .layers
-                .base,
-            chunk_data[per_chunk]
-                .face_index
-        )
-    };
+            .read()[per_chunk]
+            .layers
+            .base;
 
     crawler.entity = entity;
-
-    meshes
-        .get_mut(crawler.parent.clone())
-        .unwrap()
-        .attribute_mut(shaders::ATTRIBUTE_PER_FACE_INDEX)
-        .map(|x| {
-            match x {
-                VertexAttributeValues::Sint32(v) => {
-                    v[old_face_idx] = crawler.previous;
-                    crawler.previous = v[face_idx];
-                    v[face_idx] = 26;
-                }
-                _ => panic!(),
-            }
-        })
+    faces
+        .get_mut(entity)
+        .map(|(_old, mut new)| new.0 = 25)
         .unwrap();
 }
 
@@ -246,8 +193,6 @@ fn setup(
     commands
         .insert_resource(CrawlerState {
             entity: planet,
-            parent: mesh_handle.clone(),
-            previous: 0,
         });
 
     commands

@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 petgraph = "0.5.1"
 bevy = { path = "../../bevy" }
+bevy_mod_raycast = { path = "../../bevy_mod_raycast" }
 shaders = { path = "../shaders" }
 noise_gen = { path = "../noise_gen" }
 hexasphere = "3.3.0"

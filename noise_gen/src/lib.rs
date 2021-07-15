@@ -6,8 +6,9 @@ use arrayvec::ArrayVec;
 pub struct NoiseParameters {
     pub scale: f32,
     pub lac: f32,
-    pub bias: f32,
     pub gain: f32,
+    pub min: f32,
+    pub max: f32,
     pub seed: i32,
 }
 
@@ -274,16 +275,30 @@ unsafe fn generate_noise<S: Simd, const N: usize>(
         }
     }
 
-    let factors = min.iter().zip(max.iter())
-        .map(|(min, max)| 2.0 / (*max - *min))
+    // https://www.desmos.com/calculator/3mnimb52qf
+    let factors = min.iter()
+        .zip(max.iter())
+        .zip(
+            parameters
+                .iter()
+                .map(|param| (param.max - param.min))
+        )
+        .map(|((min, max), new_scl)| new_scl / (*max - *min))
         .collect::<ArrayVec<f32, N>>()
         .into_inner()
         .unwrap();
 
-    let end_mins = min
+    let start_mins = min
         .iter()
         .copied()
         .map(|x| unsafe { S::set1_ps(x) })
+        .collect::<ArrayVec<_, N>>()
+        .into_inner()
+        .unwrap();
+
+    let end_mins = parameters
+        .iter()
+        .map(|param| unsafe { S::set1_ps(param.min) })
         .collect::<ArrayVec<_, N>>()
         .into_inner()
         .unwrap();
@@ -296,24 +311,14 @@ unsafe fn generate_noise<S: Simd, const N: usize>(
         .into_inner()
         .unwrap();
 
-    let one = S::set1_ps(1.0);
-
-    let biases = parameters
-        .iter()
-        .map(|x| unsafe { S::set1_ps(x.bias) })
-        .collect::<ArrayVec<_, N>>()
-        .into_inner()
-        .unwrap();
-
     outputs
         .into_iter()
         .flatten()
         .map(|mut x: [S::Vf32; N]| {
             for i in 0..N {
-                x[i] = unsafe { S::sub_ps(x[i], end_mins[i]) };
+                x[i] = unsafe { S::sub_ps(x[i], start_mins[i]) };
                 x[i] = unsafe { S::mul_ps(x[i], end_factors[i]) };
-                x[i] = unsafe { S::sub_ps(x[i], one) };
-                x[i] = unsafe { S::mul_ps(x[i], biases[i]) };
+                x[i] = unsafe { S::add_ps(x[i], end_mins[i]) };
             }
             (0..S::VF32_WIDTH)
                 .map(move |lane| {
