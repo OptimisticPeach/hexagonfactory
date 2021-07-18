@@ -140,16 +140,21 @@ pub fn lights_node_system(
             data[0..ambient_light_size].copy_from_slice(bevy::core::cast_slice(&ambient_light));
 
             // light count
-            data[ambient_light_size..light_count_size]
-                .copy_from_slice(bevy::core::cast_slice(&[point_light_count as u32, 0, 0, 0]));
+            data[ambient_light_size..light_count_size].copy_from_slice(bevy::core::cast_slice(&[
+                point_light_count as u32,
+                0,
+                0,
+                0,
+            ]));
 
             // light array
             for ((point_light, global_transform), slot) in query.iter().zip(
                 data[light_count_size..current_point_light_uniform_size].chunks_exact_mut(size),
             ) {
-                slot.copy_from_slice(
-                    bevy::core::bytes_of(&LowPolyPointLightUniform::from(&point_light, &global_transform)),
-                );
+                slot.copy_from_slice(bevy::core::bytes_of(&LowPolyPointLightUniform::from(
+                    &point_light,
+                    &global_transform,
+                )));
             }
         },
     );

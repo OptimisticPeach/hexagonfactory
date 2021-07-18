@@ -1,5 +1,5 @@
-use image::{Rgb, ImageBuffer};
-use glam::{Vec3A, Quat};
+use glam::{Quat, Vec3A};
+use image::{ImageBuffer, Rgb};
 
 const SIZE: usize = 1000;
 const SCALE: f32 = 20.0;
@@ -9,29 +9,33 @@ const SEED: i32 = 10;
 fn main() {
     let mut img = ImageBuffer::new(SIZE as u32, 6 * SIZE as u32);
 
-    let mut noise_values = noise_gen::sample_cube_noise(SIZE, [
-        noise_gen::NoiseParameters {
-            scale: SCALE,
-            lac: 0.5,
-            bias: BIAS,
-            gain: 0.5,
-            seed: SEED
-        },
-        noise_gen::NoiseParameters {
-            scale: SCALE,
-            lac: 0.5,
-            bias: BIAS,
-            gain: 0.5,
-            seed: !SEED
-        },
-    ]);
+    let mut noise_values = noise_gen::sample_cube_noise(
+        SIZE,
+        [
+            noise_gen::NoiseParameters {
+                scale: SCALE,
+                lac: 0.5,
+                bias: BIAS,
+                gain: 0.5,
+                seed: SEED,
+            },
+            noise_gen::NoiseParameters {
+                scale: SCALE,
+                lac: 0.5,
+                bias: BIAS,
+                gain: 0.5,
+                seed: !SEED,
+            },
+        ],
+    );
     let noise_values = &mut noise_values[..SIZE * SIZE * 6];
 
     for (index, [ax, ay]) in noise_values.into_iter().enumerate() {
         let x = (index % SIZE) as u32;
         let y = (index / SIZE) as u32;
 
-        let mut vector = (Quat::from_rotation_x(*ax) * Quat::from_rotation_y(*ay)).mul_vec3a(Vec3A::Z);
+        let mut vector =
+            (Quat::from_rotation_x(*ax) * Quat::from_rotation_y(*ay)).mul_vec3a(Vec3A::Z);
 
         vector *= 0.5;
         vector += Vec3A::splat(0.5);

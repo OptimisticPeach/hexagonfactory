@@ -1,6 +1,6 @@
+use arrayvec::ArrayVec;
 use bevy::math::Vec3A;
 use simdeez::sse41::*;
-use arrayvec::ArrayVec;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct NoiseParameters {
@@ -111,29 +111,17 @@ fn generate_cube_inputs<S: Simd>(size: usize) -> (Vec<S::Vf32>, Vec<S::Vf32>, Ve
     let mut ys = Vec::with_capacity(ys_f32.len() / S::VF32_WIDTH);
     let mut zs = Vec::with_capacity(zs_f32.len() / S::VF32_WIDTH);
 
-    xs_f32
-        .chunks(S::VF32_WIDTH)
-        .for_each(|x| {
-            unsafe {
-                xs.push(S::load_ps(&x[0]));
-            }
-        });
+    xs_f32.chunks(S::VF32_WIDTH).for_each(|x| unsafe {
+        xs.push(S::load_ps(&x[0]));
+    });
 
-    ys_f32
-        .chunks(S::VF32_WIDTH)
-        .for_each(|x| {
-            unsafe {
-                ys.push(S::load_ps(&x[0]));
-            }
-        });
+    ys_f32.chunks(S::VF32_WIDTH).for_each(|x| unsafe {
+        ys.push(S::load_ps(&x[0]));
+    });
 
-    zs_f32
-        .chunks(S::VF32_WIDTH)
-        .for_each(|x| {
-            unsafe {
-                zs.push(S::load_ps(&x[0]));
-            }
-        });
+    zs_f32.chunks(S::VF32_WIDTH).for_each(|x| unsafe {
+        zs.push(S::load_ps(&x[0]));
+    });
 
     (xs, ys, zs)
 }
@@ -177,7 +165,9 @@ fn generate_inputs<S: Simd>(vectors: &[Vec3A]) -> (Vec<S::Vf32>, Vec<S::Vf32>, V
     (xs, ys, zs)
 }
 
-unsafe fn generate_many_array_values<S: Simd, const N: usize, const U: usize>(value: f32) -> [[S::Vf32; N]; U] {
+unsafe fn generate_many_array_values<S: Simd, const N: usize, const U: usize>(
+    value: f32,
+) -> [[S::Vf32; N]; U] {
     let val = S::set1_ps(value);
     let val = (0..N)
         .map(|_| val)
@@ -209,17 +199,11 @@ unsafe fn generate_noise<S: Simd, const N: usize>(
             .chain(std::iter::once((5 * inc)..xs.len()))
             .collect::<Vec<_>>();
 
-        for (
-            (range, output),
-            (mins, maxs)
-        ) in ranges
+        for ((range, output), (mins, maxs)) in ranges
             .into_iter()
             .zip(outputs.iter_mut())
-            .zip(
-                mins
-                    .iter_mut()
-                    .zip(maxs.iter_mut())
-            ) {
+            .zip(mins.iter_mut().zip(maxs.iter_mut()))
+        {
             let range = range;
             let xs = &xs[range.clone()];
             let ys = &ys[range.clone()];
@@ -276,13 +260,10 @@ unsafe fn generate_noise<S: Simd, const N: usize>(
     }
 
     // https://www.desmos.com/calculator/3mnimb52qf
-    let factors = min.iter()
+    let factors = min
+        .iter()
         .zip(max.iter())
-        .zip(
-            parameters
-                .iter()
-                .map(|param| (param.max - param.min))
-        )
+        .zip(parameters.iter().map(|param| (param.max - param.min)))
         .map(|((min, max), new_scl)| new_scl / (*max - *min))
         .collect::<ArrayVec<f32, N>>()
         .into_inner()
@@ -320,14 +301,13 @@ unsafe fn generate_noise<S: Simd, const N: usize>(
                 x[i] = unsafe { S::mul_ps(x[i], end_factors[i]) };
                 x[i] = unsafe { S::add_ps(x[i], end_mins[i]) };
             }
-            (0..S::VF32_WIDTH)
-                .map(move |lane| {
-                    (0..N)
-                        .map(|param| x[param][lane])
-                        .collect::<ArrayVec<_, N>>()
-                        .into_inner()
-                        .unwrap()
-                })
+            (0..S::VF32_WIDTH).map(move |lane| {
+                (0..N)
+                    .map(|param| x[param][lane])
+                    .collect::<ArrayVec<_, N>>()
+                    .into_inner()
+                    .unwrap()
+            })
         })
         .flatten()
         .collect::<Vec<_>>()
@@ -358,8 +338,8 @@ fn make_noise_compiletime<const N: usize>(
 }
 
 #[cfg(all(
-target_feature = "sse2",
-not(any(target_feature = "sse4.1", target_feature = "avx2"))
+    target_feature = "sse2",
+    not(any(target_feature = "sse4.1", target_feature = "avx2"))
 ))]
 fn make_noise_compiletime<const N: usize>(
     data: &[Vec3A],
@@ -369,9 +349,9 @@ fn make_noise_compiletime<const N: usize>(
 }
 
 #[cfg(not(any(
-target_feature = "sse4.1",
-target_feature = "avx2",
-target_feature = "sse2"
+    target_feature = "sse4.1",
+    target_feature = "avx2",
+    target_feature = "sse2"
 )))]
 fn make_noise_compiletime<const N: usize>(
     data: &[Vec3A],
@@ -386,7 +366,6 @@ pub fn sample_all_noise<const N: usize>(
 ) -> Vec<[f32; N]> {
     make_noise_compiletime(inputs, parameters)
 }
-
 
 unsafe fn make_cube_noise<S: Simd, const N: usize>(
     size: usize,
@@ -413,8 +392,8 @@ fn make_cube_noise_compiletime<const N: usize>(
 }
 
 #[cfg(all(
-target_feature = "sse2",
-not(any(target_feature = "sse4.1", target_feature = "avx2"))
+    target_feature = "sse2",
+    not(any(target_feature = "sse4.1", target_feature = "avx2"))
 ))]
 fn make_cube_noise_compiletime<const N: usize>(
     size: usize,
@@ -424,9 +403,9 @@ fn make_cube_noise_compiletime<const N: usize>(
 }
 
 #[cfg(not(any(
-target_feature = "sse4.1",
-target_feature = "avx2",
-target_feature = "sse2"
+    target_feature = "sse4.1",
+    target_feature = "avx2",
+    target_feature = "sse2"
 )))]
 fn make_cube_noise_compiletime<const N: usize>(
     size: usize,

@@ -1,9 +1,9 @@
-use Measure::*;
-use Biome::*;
-use shaders::PerFaceData;
 use bevy::render::color::Color;
-use std::ops::Range;
 use bevy::utils::HashMap;
+use shaders::PerFaceData;
+use std::ops::Range;
+use Biome::*;
+use Measure::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Hash, Eq)]
 pub enum Biome {

@@ -1,12 +1,15 @@
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 
+use arrayvec::ArrayVec;
 use bevy::asset::LoadState;
 use bevy::render::mesh::Indices;
-use shaders::{LowPolyMaterial, LowPolyPBRBundle, LowPolyPBRPlugin};
 use rand::{thread_rng, Rng};
-use sphereorder::{FaceMaterialIdx, OldFaceMaterialIdx, NeighbourOf, BoardInitializationType, GeographicalParams, PlanetDesc, SkyParams};
-use arrayvec::ArrayVec;
+use shaders::{LowPolyMaterial, LowPolyPBRBundle, LowPolyPBRPlugin};
+use sphereorder::{
+    BoardInitializationType, FaceMaterialIdx, GeographicalParams, NeighbourOf, OldFaceMaterialIdx,
+    PlanetDesc, SkyParams,
+};
 
 // mod geometry;
 
@@ -30,13 +33,12 @@ fn main() {
             SystemSet::on_update(GameState::Load)
                 .with_system(poll_repeating_textures_load.system()),
         )
-        .add_system_set(SystemSet::on_enter(GameState::Game)
-            // .with_system(init_crawler.system())
-            // .with_system(test_all.system())
+        .add_system_set(
+            SystemSet::on_enter(GameState::Game), // .with_system(init_crawler.system())
+                                                  // .with_system(test_all.system())
         )
-        .add_system_set(SystemSet::on_update(GameState::Game)
-            .with_system(rotate.system())
-            // .with_system(crawl.system())
+        .add_system_set(
+            SystemSet::on_update(GameState::Game).with_system(rotate.system()), // .with_system(crawl.system())
         )
         .run();
 }
@@ -55,8 +57,9 @@ fn poll_repeating_textures_load(
     mut textures: ResMut<Assets<Texture>>,
     mut state: ResMut<State<GameState>>,
 ) {
-    loading.0.retain(|x| {
-        match server.get_load_state(x.clone()) {
+    loading
+        .0
+        .retain(|x| match server.get_load_state(x.clone()) {
             LoadState::Loaded => {
                 let texture = textures.get_mut(x.clone()).unwrap();
                 texture.reinterpret_stacked_2d_as_array(6);
@@ -65,8 +68,7 @@ fn poll_repeating_textures_load(
             LoadState::Failed => panic!(),
             LoadState::Loading | LoadState::NotLoaded => true,
             LoadState::Unloaded => panic!(),
-        }
-    });
+        });
 
     if loading.0.is_empty() {
         state.set(GameState::Game).unwrap();
@@ -86,9 +88,7 @@ fn init_crawler(
     let children = children.get(crawler.entity).unwrap();
     crawler.entity = children[rng.gen_range(0..children.len())];
 
-    let mut member = member
-        .get_mut(crawler.entity)
-        .unwrap();
+    let mut member = member.get_mut(crawler.entity).unwrap();
 
     member.0 = 25;
 }
@@ -103,9 +103,7 @@ fn crawl(
     //     .map(|(old, mut new)| new.0 = old.0)
     //     .unwrap();
 
-    let member = member
-        .get(crawler.entity)
-        .unwrap();
+    let member = member.get(crawler.entity).unwrap();
 
     let next = member
         .map(|(entity, _value)| entity)
@@ -121,10 +119,7 @@ fn crawl(
 }
 
 /// set up a simple 3D scene
-fn setup(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let normal_map = asset_server.load::<Texture, _>("normal_map.png");
     commands.insert_resource(PendingRepeatTextures(vec![normal_map.clone()]));
 
@@ -132,16 +127,11 @@ fn setup(
         .spawn()
         .insert(PlanetDesc {
             subvidisions: 8,
-            planet_type: BoardInitializationType::Space(SkyParams {
-                land_seed: 1
-            })
+            planet_type: BoardInitializationType::Space(SkyParams { land_seed: 1 }),
         })
         .id();
 
-    commands
-        .insert_resource(CrawlerState {
-            entity: planet,
-        });
+    commands.insert_resource(CrawlerState { entity: planet });
 
     // light
     commands.spawn_bundle(PointLightBundle {
