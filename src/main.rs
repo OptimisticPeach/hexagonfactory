@@ -5,7 +5,7 @@ use bevy::asset::LoadState;
 use bevy::render::mesh::Indices;
 use shaders::{LowPolyMaterial, LowPolyPBRBundle, LowPolyPBRPlugin};
 use rand::{thread_rng, Rng};
-use sphereorder::{BoardMember, FaceMaterialIdx, OldFaceMaterialIdx};
+use sphereorder::{FaceMaterialIdx, OldFaceMaterialIdx, NeighbourOf, BoardInitializationType, GeographicalParams};
 use arrayvec::ArrayVec;
 
 // mod geometry;
@@ -77,14 +77,6 @@ struct CrawlerState {
     entity: Entity,
 }
 
-fn test_all(
-    mut member: Query<(&mut FaceMaterialIdx, &BoardMember)>,
-) {
-    member
-        .iter_mut()
-        .for_each(|(mut x, member)| x.0 = 25);
-}
-
 fn init_crawler(
     mut crawler: ResMut<CrawlerState>,
     children: Query<&Children>,
@@ -103,7 +95,7 @@ fn init_crawler(
 
 fn crawl(
     mut crawler: ResMut<CrawlerState>,
-    member: Query<&BoardMember>,
+    member: Query<&Relation<NeighbourOf>>,
     mut faces: Query<(&OldFaceMaterialIdx, &mut FaceMaterialIdx)>,
 ) {
     // faces
@@ -116,37 +108,14 @@ fn crawl(
         .unwrap();
 
     let next = member
-        .board
-        .total_graph
-        .neighbors(
-            member
-                .graph_idx
-        )
+        .map(|(entity, _value)| entity)
         .collect::<ArrayVec<_, 6>>();
 
     let next = next[thread_rng().gen_range(0..next.len())];
 
-    let (chunk, per_chunk) = sphereorder::idx_to_chunk(
-        *member
-            .board
-            .total_graph
-            .node_weight(next)
-            .unwrap(),
-        member
-            .board
-            .per_chunk,
-    );
-
-    let entity = member
-            .board
-            .tile_data[chunk]
-            .read()[per_chunk]
-            .layers
-            .base;
-
-    crawler.entity = entity;
+    crawler.entity = next;
     faces
-        .get_mut(entity)
+        .get_mut(next)
         .map(|(_old, mut new)| new.0 = 25)
         .unwrap();
 }
@@ -162,7 +131,14 @@ fn setup(
     commands.insert_resource(PendingRepeatTextures(vec![normal_map.clone()]));
 
     let start = std::time::Instant::now();
-    let (mesh, mut per_face_data, planet) = sphereorder::BoardGraph::build(8).create(&mut commands);
+    let planet = commands.spawn().id();
+    let (mesh, mut per_face_data) = sphereorder::BoardBuilder {
+        subdivisions: 8,
+        state: BoardInitializationType::Base(GeographicalParams {
+            metal_seed: 10,
+            temp_seed: 20
+        })
+    }.create_on(&mut commands, planet);
     let time = start.elapsed();
     println!("time: {:?}", time);
     // println!("{:#?}", per_face_data);

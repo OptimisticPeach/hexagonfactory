@@ -3149,7 +3149,6 @@ dependencies = [
  "lazy_static",
  "noise_gen",
  "parking_lot",
- "petgraph",
  "rand 0.8.3",
  "shaders",
 ]
