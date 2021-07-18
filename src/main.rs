@@ -5,7 +5,7 @@ use bevy::asset::LoadState;
 use bevy::render::mesh::Indices;
 use shaders::{LowPolyMaterial, LowPolyPBRBundle, LowPolyPBRPlugin};
 use rand::{thread_rng, Rng};
-use sphereorder::{FaceMaterialIdx, OldFaceMaterialIdx, NeighbourOf, BoardInitializationType, GeographicalParams};
+use sphereorder::{FaceMaterialIdx, OldFaceMaterialIdx, NeighbourOf, BoardInitializationType, GeographicalParams, PlanetDesc};
 use arrayvec::ArrayVec;
 
 // mod geometry;
@@ -130,68 +130,21 @@ fn setup(
     let normal_map = asset_server.load::<Texture, _>("normal_map.png");
     commands.insert_resource(PendingRepeatTextures(vec![normal_map.clone()]));
 
-    let start = std::time::Instant::now();
-    let planet = commands.spawn().id();
-    let (mesh, mut per_face_data) = sphereorder::BoardBuilder {
-        subdivisions: 8,
-        state: BoardInitializationType::Base(GeographicalParams {
-            metal_seed: 10,
-            temp_seed: 20
-        })
-    }.create_on(&mut commands, planet);
-    let time = start.elapsed();
-    println!("time: {:?}", time);
-    // println!("{:#?}", per_face_data);
-
-    per_face_data.push(
-        shaders::PerFaceData {
-            colour: bevy::render::color::Color::GOLD.as_linear_rgba_f32(),
-            roughness: 0.5,
-            metallic: 1.0,
-            reflectance: 1.0,
-            ..Default::default()
-        }
-    );
-    
-    println!(
-        "{}, {}, {}",
-        per_face_data.len(),
-        mesh.indices()
-            .map(|x| match x {
-                Indices::U32(x) => x.len(),
-                Indices::U16(x) => x.len(),
+    let planet = commands
+        .spawn()
+        .insert(PlanetDesc {
+            subvidisions: 8,
+            planet_type: BoardInitializationType::Base(GeographicalParams{
+                metal_seed: 10,
+                temp_seed: 20
             })
-            .unwrap(),
-        mesh.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len()
-    );
-
-    let mesh_handle = meshes.add(mesh);
+        })
+        .id();
 
     commands
         .insert_resource(CrawlerState {
             entity: planet,
         });
-
-    commands
-        .entity(planet)
-        .insert_bundle(LowPolyPBRBundle {
-        mesh: mesh_handle.clone(),
-        material: planet_materials.add(LowPolyMaterial {
-            base_color_texture: None,
-            metallic_roughness_texture: None,
-            normal_map: Some(normal_map),
-            per_face_data,
-            ..Default::default()
-        }),
-        transform: {
-            let mut t = Transform::from_xyz(0.0, 0.0, 0.0);
-            t.apply_non_uniform_scale(Vec3::splat(2.0));
-            t.rotate(Quat::from_rotation_y(-0.3));
-            t.rotate(Quat::from_rotation_x(0.4));
-            t
-        },
-        ..Default::default()
-    });
 
     // light
     commands.spawn_bundle(PointLightBundle {

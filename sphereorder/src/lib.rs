@@ -22,8 +22,10 @@ use bevy::prelude::BuildChildren;
 
 pub struct NeighbourOf;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PlanetDesc {
     pub subvidisions: usize,
+    pub planet_type: BoardInitializationType,
 }
 
 pub(crate) struct TileDataIdx(usize);
@@ -39,13 +41,13 @@ pub struct FaceMaterialIdx(pub i32);
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OldFaceMaterialIdx(pub i32);
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GeographicalParams {
     pub metal_seed: i32,
     pub temp_seed: i32,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BoardInitializationType {
     Empty,
     Base(GeographicalParams),
@@ -55,6 +57,15 @@ pub enum BoardInitializationType {
 pub struct BoardBuilder {
     pub subdivisions: usize,
     pub state: BoardInitializationType,
+}
+
+impl From<PlanetDesc> for BoardBuilder {
+    fn from(x: PlanetDesc) -> Self {
+        Self {
+            subdivisions: x.subvidisions,
+            state: x.planet_type,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Hash)]
@@ -131,11 +142,6 @@ fn make_point_transform(normalized_point: Vec3A) -> Transform {
 
 impl BoardBuilder {
     pub fn create_on(&self, commands: &mut Commands, board: Entity) -> (Mesh, Vec<PerFaceData>) {
-        commands
-            .entity(board)
-            .insert(PlanetDesc { subvidisions: self.subdivisions })
-            .id();
-
         let sphere = IcoSphere::new(self.subdivisions, |_| ());
         let original_points = sphere.raw_points();
         // Keep the middle points and the between-points separate
