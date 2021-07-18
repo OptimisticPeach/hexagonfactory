@@ -5,7 +5,7 @@ use bevy::asset::LoadState;
 use bevy::render::mesh::Indices;
 use shaders::{LowPolyMaterial, LowPolyPBRBundle, LowPolyPBRPlugin};
 use rand::{thread_rng, Rng};
-use sphereorder::{FaceMaterialIdx, OldFaceMaterialIdx, NeighbourOf, BoardInitializationType, GeographicalParams, PlanetDesc};
+use sphereorder::{FaceMaterialIdx, OldFaceMaterialIdx, NeighbourOf, BoardInitializationType, GeographicalParams, PlanetDesc, SkyParams};
 use arrayvec::ArrayVec;
 
 // mod geometry;
@@ -123,9 +123,7 @@ fn crawl(
 /// set up a simple 3D scene
 fn setup(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
     asset_server: Res<AssetServer>,
-    mut planet_materials: ResMut<Assets<LowPolyMaterial>>,
 ) {
     let normal_map = asset_server.load::<Texture, _>("normal_map.png");
     commands.insert_resource(PendingRepeatTextures(vec![normal_map.clone()]));
@@ -134,9 +132,8 @@ fn setup(
         .spawn()
         .insert(PlanetDesc {
             subvidisions: 8,
-            planet_type: BoardInitializationType::Base(GeographicalParams{
-                metal_seed: 10,
-                temp_seed: 20
+            planet_type: BoardInitializationType::Space(SkyParams {
+                land_seed: 1
             })
         })
         .id();

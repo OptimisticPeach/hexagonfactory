@@ -1,9 +1,8 @@
 use bevy::ecs::entity::Entity;
-use bevy::math::{Quat, Mat4};
+use bevy::math::{Quat, Mat4, Vec3A};
 use shaders::PerFaceData;
 use bevy::ecs::system::Commands;
 use arrayvec::ArrayVec;
-use bevy::math::Vec3A;
 use bevy::render::mesh::{Indices, Mesh};
 use bevy::render::pipeline::PrimitiveTopology;
 use bevy::utils::{HashMap, HashSet};
@@ -19,6 +18,7 @@ pub mod board_ops;
 pub use biome::Biome;
 pub use board_ops::BoardPlugin;
 use bevy::prelude::BuildChildren;
+use std::ops::Range;
 
 pub struct NeighbourOf;
 
@@ -31,8 +31,7 @@ pub struct PlanetDesc {
 pub(crate) struct TileDataIdx(usize);
 
 pub struct TileData {
-    pub temp: f32,
-    pub metal: bool,
+    pub biome: Biome,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -58,6 +57,89 @@ pub enum BoardInitializationType {
     Base(GeographicalParams),
     Sky(SkyParams),
     Space(SkyParams),
+}
+
+impl BoardInitializationType {
+    pub(crate) fn make_biomes(&self, mid_points: &[Vec3A]) -> (Vec<Biome>, &'static HashMap<Biome, Range<i32>>, Vec<PerFaceData>) {
+        match self {
+            &BoardInitializationType::Base(GeographicalParams {
+                metal_seed, temp_seed
+            }) => {
+                let tile_datas = noise_gen::sample_all_noise(mid_points,
+                    [
+                        // Whether it's dirt or metal
+                        noise_gen::NoiseParameters {
+                            scale: 0.5,
+                            lac: 0.1,
+                            gain: 0.9,
+                            min: 0.0,
+                            max: 1.0,
+                            seed: metal_seed,
+                        },
+                        // Whether it's terrain or lava
+                        noise_gen::NoiseParameters {
+                            scale: 1.0,
+                            lac: 1.0,
+                            gain: 1.0,
+                            min: -1.0,
+                            max: 1.0,
+                            seed: temp_seed,
+                        },
+                    ]
+                );
+                (
+                    crate::biome::make_base_biomes(&tile_datas),
+                    &*crate::biome::BASE_BIOME_MAP,
+                    crate::biome::BASE_BIOME_COLOURS.to_vec(),
+                )
+            },
+            &BoardInitializationType::Sky(SkyParams { land_seed }) => {
+                let tile_datas = noise_gen::sample_all_noise(mid_points,
+                    [
+                        // Whether it's dirt or metal
+                        noise_gen::NoiseParameters {
+                            scale: 0.5,
+                            lac: 0.1,
+                            gain: 0.9,
+                            min: 0.0,
+                            max: 1.0,
+                            seed: land_seed,
+                        },
+                    ]
+                );
+                (
+                    crate::biome::make_sky_biomes(&tile_datas),
+                    &*crate::biome::SKY_BIOME_MAP,
+                    crate::biome::SKY_BIOME_COLOURS.to_vec(),
+                )
+            }
+            &BoardInitializationType::Space(SkyParams { land_seed }) => {
+                let tile_datas = noise_gen::sample_all_noise(mid_points,
+                    [
+                        // Whether it's dirt or metal
+                        noise_gen::NoiseParameters {
+                            scale: 0.5,
+                            lac: 0.1,
+                            gain: 0.9,
+                            min: 0.0,
+                            max: 1.0,
+                            seed: land_seed,
+                        },
+                    ]
+                );
+                (
+                    crate::biome::make_space_biomes(&tile_datas),
+                    &*crate::biome::SPACE_BIOME_MAP,
+                    crate::biome::SPACE_BIOME_COLOURS.to_vec(),
+                )
+            }
+            BoardInitializationType::Empty => (
+                mid_points.iter().map(|_| Biome::Empty).collect(),
+                &*crate::biome::SPACE_BIOME_MAP,
+                crate::biome::SPACE_BIOME_COLOURS.to_vec(),
+            ),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -259,48 +341,19 @@ impl BoardBuilder {
                 .insert_relation(NeighbourOf, a);
         }
 
-        let geographical_parameters = if let BoardInitializationType::Base(x) = self.state { x } else { panic!() };
-
-        let mut tile_datas = noise_gen::sample_all_noise(&mid_points,
-            [
-                // Whether it's dirt or metal
-                noise_gen::NoiseParameters {
-                    scale: 0.5,
-                    lac: 0.1,
-                    gain: 0.9,
-                    min: 0.0,
-                    max: 1.0,
-                    seed: geographical_parameters.metal_seed,
-                },
-                // Whether it's terrain or lava
-                noise_gen::NoiseParameters {
-                    scale: 1.0,
-                    lac: 1.0,
-                    gain: 1.0,
-                    min: -1.0,
-                    max: 1.0,
-                    seed: geographical_parameters.temp_seed,
-                },
-            ]
-        );
-
-        let biomes = crate::biome::make_base_biomes(&mut tile_datas);
-
-        let per_face_data = crate::biome::BASE_BIOME_COLOURS.to_vec();
-
-        let mut rng = rand::thread_rng();
-        let hmap = &*crate::biome::BASE_BIOME_MAP;
-
         commands
             .entity(board)
             .push_children(&entities);
 
+        let (biomes, hmap, per_face_data) = self.state.make_biomes(&mid_points);
+
+        let mut rng = rand::thread_rng();
+
         entities
             .iter()
             .zip(biomes.into_iter())
-            .zip(tile_datas.into_iter())
             .enumerate()
-            .for_each(|(idx, ((&entity, biome), [_metal, temp ]))| {
+            .for_each(|(idx, (&entity, biome))| {
                 let biome_idx = rng.gen_range(hmap.get(&biome).unwrap().clone());
 
                 commands
@@ -312,8 +365,7 @@ impl BoardBuilder {
                             FaceMaterialIdx(biome_idx),
                             OldFaceMaterialIdx(biome_idx),
                             TileData {
-                                temp,
-                                metal: matches!(biome, Biome::Metal),
+                                biome,
                             },
                             TileDataIdx(idx + per_face_indices.len()),
                         )
