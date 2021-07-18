@@ -64,6 +64,7 @@ fn poll_repeating_textures_load(
             }
             LoadState::Failed => panic!(),
             LoadState::Loading | LoadState::NotLoaded => true,
+            LoadState::Unloaded => panic!(),
         }
     });
 
