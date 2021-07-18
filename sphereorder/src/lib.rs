@@ -48,9 +48,16 @@ pub struct GeographicalParams {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SkyParams {
+    pub land_seed: i32,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BoardInitializationType {
     Empty,
     Base(GeographicalParams),
+    Sky(SkyParams),
+    Space(SkyParams),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -277,12 +284,12 @@ impl BoardBuilder {
             ]
         );
 
-        let biomes = crate::biome::make_biomes(&mut tile_datas);
+        let biomes = crate::biome::make_base_biomes(&mut tile_datas);
 
-        let per_face_data = crate::biome::BIOME_COLOURS.to_vec();
+        let per_face_data = crate::biome::BASE_BIOME_COLOURS.to_vec();
 
         let mut rng = rand::thread_rng();
-        let hmap = &*crate::biome::BIOME_MAP;
+        let hmap = &*crate::biome::BASE_BIOME_MAP;
 
         commands
             .entity(board)
