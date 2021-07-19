@@ -180,6 +180,7 @@ impl Index {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 struct SurroundingEntry {
     edge: [u32; 2],
     avg_idx: u32,
@@ -303,10 +304,11 @@ impl BoardBuilder {
         }
 
         // For every full hexagon we get...
-        for (old_center, mut sides) in surrounding_points {
+        for (old_center, sides) in surrounding_points.iter() {
+            let mut sides = sides.clone();
             let center = mid_points.len();
             let entity = commands.spawn().id();
-            old_center_to_node.insert(old_center, entity);
+            old_center_to_node.insert(*old_center, entity);
 
             let mut ordered_points = ArrayVec::<usize, 6>::new();
 
@@ -355,19 +357,21 @@ impl BoardBuilder {
             entities.push(entity);
         }
 
-        for (edge_a, edge_b) in unordered_edges {
-            let a = *old_center_to_node.get(&edge_a).unwrap();
-            let b = *old_center_to_node.get(&edge_b).unwrap();
-            commands.entity(a).insert_relation(NeighbourOf, b);
-
-            commands.entity(b).insert_relation(NeighbourOf, a);
-        }
+        // for (edge_a, edge_b) in unordered_edges {
+        //     let a = *old_center_to_node.get(&edge_a).unwrap();
+        //     let b = *old_center_to_node.get(&edge_b).unwrap();
+        //     commands.entity(a).insert_relation(NeighbourOf, b);
+        //
+        //     commands.entity(b).insert_relation(NeighbourOf, a);
+        // }
 
         commands.entity(board).push_children(&entities);
 
         let (biomes, hmap, per_face_data) = self.state.make_biomes(&mid_points);
 
         let mut rng = rand::thread_rng();
+
+        println!("{}", entities.len());
 
         entities
             .iter()

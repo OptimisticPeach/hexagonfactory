@@ -3,6 +3,16 @@ use bevy::ecs::system::{Commands, Query, ResMut};
 use bevy_mod_raycast::DefaultRaycastingPlugin;
 
 pub struct BoardPlugin;
+pub struct PlanetLayerOf;
+pub struct LayerChild {
+    layer_number: usize
+}
+
+impl LayerChild {
+    pub fn subdivisions(&self) -> usize {
+        self.layer_number * 3 + 8
+    }
+}
 
 mod changed_tiletype;
 mod select_tile;

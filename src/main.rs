@@ -10,6 +10,7 @@ use sphereorder::{
     BoardInitializationType, FaceMaterialIdx, GeographicalParams, NeighbourOf, OldFaceMaterialIdx,
     PlanetDesc, SkyParams,
 };
+use bevy::ecs::component::{ComponentDescriptor, StorageType};
 
 // mod geometry;
 
@@ -20,7 +21,8 @@ pub enum GameState {
 }
 
 fn main() {
-    App::build()
+    let mut x = App::build();
+    x
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
         .add_plugin(LowPolyPBRPlugin)
@@ -39,8 +41,9 @@ fn main() {
         )
         .add_system_set(
             SystemSet::on_update(GameState::Game).with_system(rotate.system()), // .with_system(crawl.system())
-        )
-        .run();
+        );
+    x.world_mut().register_relation(ComponentDescriptor::new::<NeighbourOf>(StorageType::SparseSet));
+       x .run();
 }
 
 fn rotate(mut transforms: Query<(&mut Transform, With<Draw>)>) {
@@ -126,8 +129,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let planet = commands
         .spawn()
         .insert(PlanetDesc {
-            subvidisions: 8,
-            planet_type: BoardInitializationType::Space(SkyParams { land_seed: 1 }),
+            subvidisions: 30,
+            planet_type: BoardInitializationType::Base(GeographicalParams { temp_seed: 1, metal_seed: 2 }),
         })
         .id();
 
