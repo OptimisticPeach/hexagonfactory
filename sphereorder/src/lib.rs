@@ -1,12 +1,12 @@
 use arrayvec::ArrayVec;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::system::Commands;
-use bevy::math::{Mat4, Quat, Vec3A};
+use bevy::math::{Mat4, Quat, Vec3A, Vec3};
 use bevy::render::mesh::{Indices, Mesh};
 use bevy::render::pipeline::PrimitiveTopology;
 use bevy::utils::{HashMap, HashSet};
 use hexasphere::shapes::IcoSphere;
-use shaders::PerFaceData;
+use shaders::{PerFaceData, LowPolyMaterial, LowPolyPBRBundle};
 
 use bevy::transform::components::{GlobalTransform, Transform};
 
@@ -19,6 +19,8 @@ use bevy::prelude::BuildChildren;
 pub use biome::Biome;
 pub use board_ops::BoardPlugin;
 use std::ops::Range;
+use bevy::ecs::prelude::ResMut;
+use bevy::asset::Assets;
 
 pub struct NeighbourOf;
 
@@ -81,6 +83,7 @@ impl BoardInitializationType {
                             scale: 0.5,
                             lac: 0.1,
                             gain: 0.9,
+                            octaves: 4,
                             min: 0.0,
                             max: 1.0,
                             seed: metal_seed,
@@ -90,6 +93,7 @@ impl BoardInitializationType {
                             scale: 1.0,
                             lac: 1.0,
                             gain: 1.0,
+                            octaves: 4,
                             min: -1.0,
                             max: 1.0,
                             seed: temp_seed,
@@ -101,15 +105,16 @@ impl BoardInitializationType {
                     &*crate::biome::BASE_BIOME_MAP,
                     crate::biome::BASE_BIOME_COLOURS.to_vec(),
                 )
-            }
+            },
             &BoardInitializationType::Sky(SkyParams { land_seed }) => {
                 let tile_datas = noise_gen::sample_all_noise(
                     mid_points,
                     [noise_gen::NoiseParameters {
-                        scale: 6.0,
-                        lac: 0.1,
-                        gain: 0.9,
-                        min: -1.0,
+                        scale: 2.0,
+                        lac: 0.21,
+                        gain: 0.0,
+                        octaves: 2,
+                        min: -2.0,
                         max: 1.0,
                         seed: land_seed,
                     }],
@@ -119,7 +124,7 @@ impl BoardInitializationType {
                     &*crate::biome::SKY_BIOME_MAP,
                     crate::biome::SKY_BIOME_COLOURS.to_vec(),
                 )
-            }
+            },
             &BoardInitializationType::Space(SkyParams { land_seed }) => {
                 let tile_datas = noise_gen::sample_all_noise(
                     mid_points,
@@ -129,6 +134,7 @@ impl BoardInitializationType {
                             scale: 8.0,
                             lac: 0.2,
                             gain: 0.9,
+                            octaves: 4,
                             min: -1.0,
                             max: 1.0,
                             seed: land_seed,
@@ -140,7 +146,7 @@ impl BoardInitializationType {
                     &*crate::biome::SPACE_BIOME_MAP,
                     crate::biome::SPACE_BIOME_COLOURS.to_vec(),
                 )
-            }
+            },
             BoardInitializationType::Empty => (
                 mid_points.iter().map(|_| Biome::Empty).collect(),
                 &*crate::biome::SPACE_BIOME_MAP,
@@ -250,7 +256,13 @@ fn make_point_transform(normalized_point: Vec3A) -> Transform {
 }
 
 impl BoardBuilder {
-    pub fn create_on(&self, commands: &mut Commands, board: Entity) -> (Mesh, Vec<PerFaceData>) {
+    pub fn create_on(
+        &self,
+        commands: &mut Commands,
+        board: Entity,
+        meshes: &mut Assets<Mesh>,
+        planet_materials: &mut Assets<LowPolyMaterial>,
+    ) {
         let sphere = IcoSphere::new(self.subdivisions, |_| ());
         let original_points = sphere.raw_points();
         // Keep the middle points and the between-points separate
@@ -289,6 +301,10 @@ impl BoardBuilder {
         let mut old_center_to_node = HashMap::default();
 
         let old_indices = sphere.get_all_indices();
+
+        // I chose 6 & 7 arbitrarily, trying to avoid pentagons and
+        // mostly scale hexagons.
+        let scale_factor = 1.0 / (original_points[old_indices[6] as usize] - original_points[old_indices[7] as usize]).length();
 
         for triangle in old_indices.chunks(3) {
             add_chunk_triangle_indices(
@@ -357,21 +373,17 @@ impl BoardBuilder {
             entities.push(entity);
         }
 
-        // for (edge_a, edge_b) in unordered_edges {
-        //     let a = *old_center_to_node.get(&edge_a).unwrap();
-        //     let b = *old_center_to_node.get(&edge_b).unwrap();
-        //     commands.entity(a).insert_relation(NeighbourOf, b);
-        //
-        //     commands.entity(b).insert_relation(NeighbourOf, a);
-        // }
+        for (edge_a, edge_b) in unordered_edges {
+            let a = *old_center_to_node.get(&edge_a).unwrap();
+            let b = *old_center_to_node.get(&edge_b).unwrap();
+            commands.entity(a).insert_relation(NeighbourOf, b);
 
-        commands.entity(board).push_children(&entities);
+            commands.entity(b).insert_relation(NeighbourOf, a);
+        }
 
         let (biomes, hmap, per_face_data) = self.state.make_biomes(&mid_points);
 
         let mut rng = rand::thread_rng();
-
-        println!("{}", entities.len());
 
         entities
             .iter()
@@ -433,6 +445,20 @@ impl BoardBuilder {
         );
         mesh.set_attribute(shaders::ATTRIBUTE_PER_FACE_INDEX, per_face_indices);
 
-        (mesh, per_face_data)
+        println!("{:?}", scale_factor);
+
+        commands
+            .entity(board)
+            .push_children(&entities)
+            .insert_bundle(LowPolyPBRBundle {
+                mesh: meshes.add(mesh),
+                material: planet_materials.add(LowPolyMaterial {
+                    per_face_data,
+                    double_sided: true,
+                    ..Default::default()
+                }),
+                transform: Transform::from_scale(Vec3::splat(scale_factor)),
+                ..Default::default()
+            });
     }
 }

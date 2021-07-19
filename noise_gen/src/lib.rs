@@ -7,6 +7,7 @@ pub struct NoiseParameters {
     pub scale: f32,
     pub lac: f32,
     pub gain: f32,
+    pub octaves: u8,
     pub min: f32,
     pub max: f32,
     pub seed: i32,
@@ -228,7 +229,7 @@ unsafe fn generate_noise<S: Simd, const N: usize>(
                             let z = S::mul_ps(scale, zs[i]);
 
                             let value: S::Vf32 =
-                                simdnoise::simplex::fbm_3d::<S>(x, y, z, lac, gain, 10, seed);
+                                simdnoise::simplex::fbm_3d::<S>(x, y, z, lac, gain, parameters[result].octaves, seed);
 
                             value
                         };

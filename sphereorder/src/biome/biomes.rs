@@ -19,14 +19,19 @@ pub enum Biome {
 
 lazy_static::lazy_static! {
     pub static ref SPACE_BIOME_MAP: HashMap<Biome, Range<i32>> = std::array::IntoIter::new([
-        (Asteroid, 1..4),
-        (Platform, 4..5),
-        (Empty, 5..6),
+        (Empty, 1..2),
+        (Asteroid, 2..5),
+        (Platform, 5..6),
     ]).collect();
 
     pub static ref SPACE_BIOME_COLOURS: [PerFaceData; 6] = [
         PerFaceData {
             colour: Color::rgb_linear(1.0, 0.0, 1.0).as_linear_rgba_f32(),
+            ..Default::default()
+        },
+        // Empty
+        PerFaceData {
+            colour: [0.0; 4],
             ..Default::default()
         },
         // Asteroid
@@ -59,17 +64,12 @@ lazy_static::lazy_static! {
             metallic: 0.1,
             ..Default::default()
         },
-        // Empty
-        PerFaceData {
-            colour: [0.0; 4],
-            ..Default::default()
-        },
     ];
 
     pub static ref SKY_BIOME_MAP: HashMap<Biome, Range<i32>> = std::array::IntoIter::new([
-        (Cloud, 1..3),
-        (Platform, 3..4),
-        (Empty, 4..5),
+        (Empty, 1..2),
+        (Cloud, 2..4),
+        (Platform, 4..5),
     ]).collect();
 
     pub static ref SKY_BIOME_COLOURS: [PerFaceData; 5] = [
@@ -77,16 +77,21 @@ lazy_static::lazy_static! {
             colour: Color::rgb_linear(1.0, 0.0, 1.0).as_linear_rgba_f32(),
             ..Default::default()
         },
+        // Empty
+        PerFaceData {
+            colour: [0.0; 4],
+            ..Default::default()
+        },
         // Cloud
         PerFaceData {
-            colour: Color::hex("f9f4e8").unwrap().as_linear_rgba_f32(),
+            colour: Color::hex("f9f4e880").unwrap().as_linear_rgba_f32(),
             reflectance: 0.0,
             roughness: 1.0,
             metallic: 0.0,
             ..Default::default()
         },
         PerFaceData {
-            colour: Color::hex("f4ebde").unwrap().as_linear_rgba_f32(),
+            colour: Color::hex("f4ebde80").unwrap().as_linear_rgba_f32(),
             reflectance: 0.0,
             roughness: 1.0,
             metallic: 0.0,
@@ -94,30 +99,31 @@ lazy_static::lazy_static! {
         },
         // Platform
         PerFaceData {
-            colour: Color::GRAY.as_linear_rgba_f32(),
+            colour: Color::hex("80808080").unwrap().as_linear_rgba_f32(),
             reflectance: 0.0,
             roughness: 1.0,
             metallic: 0.1,
             ..Default::default()
         },
-        // Empty
-        PerFaceData {
-            colour: [0.0; 4],
-            ..Default::default()
-        },
     ];
 
     pub static ref BASE_BIOME_MAP: HashMap<Biome, Range<i32>> = std::array::IntoIter::new([
-        (Dirt, 1..4),
-        (Metal, 4..7),
-        (Lava, 7..10),
-        (Ice, 10..13),
+        (Empty, 1..2),
+        (Dirt, 2..5),
+        (Metal, 5..8),
+        (Lava, 8..11),
+        (Ice, 11..14),
     ])
     .collect();
 
-    pub static ref BASE_BIOME_COLOURS: [PerFaceData; 13] = [
+    pub static ref BASE_BIOME_COLOURS: [PerFaceData; 14] = [
         PerFaceData {
             colour: Color::rgb_linear(1.0, 0.0, 1.0).as_linear_rgba_f32(),
+            ..Default::default()
+        },
+        // Empty
+        PerFaceData {
+            colour: [0.0; 4],
             ..Default::default()
         },
         // Dirt

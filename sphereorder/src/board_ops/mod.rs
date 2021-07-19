@@ -28,8 +28,7 @@ use shaders::{LowPolyMaterial, LowPolyPBRBundle};
 impl Plugin for BoardPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_system(changed_tiletype::update_material_idx_system)
-            .add_system(Self::add_new_planets)
-            .add_plugin(DefaultRaycastingPlugin::<PlanetTileRaycastSet>::default());
+            .add_system(Self::add_new_planets);
     }
 }
 
@@ -41,16 +40,12 @@ impl BoardPlugin {
         mut planet_materials: ResMut<Assets<LowPolyMaterial>>,
     ) {
         for (new_planet, planet) in query.iter() {
-            let (mesh, per_face_data) =
-                crate::BoardBuilder::from(*planet).create_on(&mut commands, new_planet);
-            commands.entity(new_planet).insert_bundle(LowPolyPBRBundle {
-                mesh: meshes.add(mesh),
-                material: planet_materials.add(LowPolyMaterial {
-                    per_face_data,
-                    ..Default::default()
-                }),
-                ..Default::default()
-            });
+            crate::BoardBuilder::from(*planet).create_on(
+                &mut commands,
+                new_planet,
+                &mut *meshes,
+                &mut *planet_materials,
+            );
         }
     }
 }

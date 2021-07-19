@@ -1,6 +1,6 @@
 use bevy::asset::{Assets, HandleUntyped};
 use bevy::reflect::TypeUuid;
-use bevy::render::pipeline::BlendComponent;
+use bevy::render::pipeline::{BlendComponent, PrimitiveState, PrimitiveTopology, FrontFace, PolygonMode};
 use bevy::render::{
     pipeline::{
         BlendFactor, BlendOperation, BlendState, ColorTargetState, ColorWrite, CompareFunction,
@@ -47,6 +47,15 @@ pub(crate) fn build_pbr_pipeline(shaders: &mut Assets<Shader>) -> PipelineDescri
                 },
             }),
         }],
+        primitive: PrimitiveState {
+            topology: PrimitiveTopology::TriangleList,
+            strip_index_format: None,
+            front_face: FrontFace::Ccw,
+            cull_mode: None,
+            polygon_mode: PolygonMode::Fill,
+            clamp_depth: false,
+            conservative: false,
+        },
         ..PipelineDescriptor::new(ShaderStages {
             vertex: shaders.add(Shader::from_glsl(
                 ShaderStage::Vertex,

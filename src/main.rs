@@ -21,35 +21,44 @@ pub enum GameState {
 }
 
 fn main() {
-    let mut x = App::build();
-    x
+    App::build()
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
         .add_plugin(LowPolyPBRPlugin)
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin)
         .add_plugin(sphereorder::BoardPlugin)
+        // .add_startup_system(make_sparse_set.exclusive_system())
         .add_state(GameState::Load)
+        // .add_system(debug_ram.exclusive_system())
         .add_system_set(SystemSet::on_enter(GameState::Load).with_system(setup.system()))
         .add_system_set(
             SystemSet::on_update(GameState::Load)
                 .with_system(poll_repeating_textures_load.system()),
         )
         .add_system_set(
-            SystemSet::on_enter(GameState::Game), // .with_system(init_crawler.system())
-                                                  // .with_system(test_all.system())
+            SystemSet::on_enter(GameState::Game),
         )
         .add_system_set(
-            SystemSet::on_update(GameState::Game).with_system(rotate.system()), // .with_system(crawl.system())
-        );
-    x.world_mut().register_relation(ComponentDescriptor::new::<NeighbourOf>(StorageType::SparseSet));
-       x .run();
+            SystemSet::on_update(GameState::Game).with_system(rotate.system()),
+        )
+        .run();
 }
 
-fn rotate(mut transforms: Query<(&mut Transform, With<Draw>)>) {
-    for (mut transform, _) in transforms.iter_mut() {
-        transform.rotate(Quat::from_rotation_x(0.005));
+struct RotationAxis(Vec3);
+
+fn make_sparse_set(world: &mut World) {
+    world.register_relation(ComponentDescriptor::new::<NeighbourOf>(StorageType::SparseSet)).unwrap();
+}
+
+fn rotate(mut transforms: Query<(&mut Transform, &RotationAxis), With<Draw>>) {
+    for (mut transform, axis) in transforms.iter_mut() {
+        transform.rotate(Quat::from_axis_angle(axis.0, 0.005));
     }
+}
+
+fn debug_ram(world: &mut World) {
+    world.debug_ram_usage();
 }
 
 struct PendingRepeatTextures(Vec<Handle<Texture>>);
@@ -78,74 +87,66 @@ fn poll_repeating_textures_load(
     }
 }
 
-struct CrawlerState {
-    entity: Entity,
-}
-
-fn init_crawler(
-    mut crawler: ResMut<CrawlerState>,
-    children: Query<&Children>,
-    mut member: Query<&mut FaceMaterialIdx>,
-) {
-    let mut rng = thread_rng();
-    let children = children.get(crawler.entity).unwrap();
-    crawler.entity = children[rng.gen_range(0..children.len())];
-
-    let mut member = member.get_mut(crawler.entity).unwrap();
-
-    member.0 = 25;
-}
-
-fn crawl(
-    mut crawler: ResMut<CrawlerState>,
-    member: Query<&Relation<NeighbourOf>>,
-    mut faces: Query<(&OldFaceMaterialIdx, &mut FaceMaterialIdx)>,
-) {
-    // faces
-    //     .get_mut(crawler.entity)
-    //     .map(|(old, mut new)| new.0 = old.0)
-    //     .unwrap();
-
-    let member = member.get(crawler.entity).unwrap();
-
-    let next = member
-        .map(|(entity, _value)| entity)
-        .collect::<ArrayVec<_, 6>>();
-
-    let next = next[thread_rng().gen_range(0..next.len())];
-
-    crawler.entity = next;
-    faces
-        .get_mut(next)
-        .map(|(_old, mut new)| new.0 = 25)
-        .unwrap();
-}
-
 /// set up a simple 3D scene
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let normal_map = asset_server.load::<Texture, _>("normal_map.png");
     commands.insert_resource(PendingRepeatTextures(vec![normal_map.clone()]));
 
-    let planet = commands
+    commands
         .spawn()
         .insert(PlanetDesc {
-            subvidisions: 30,
+            subvidisions: 8,
             planet_type: BoardInitializationType::Base(GeographicalParams { temp_seed: 1, metal_seed: 2 }),
         })
-        .id();
+        .insert(RotationAxis(Vec3::X));
 
-    commands.insert_resource(CrawlerState { entity: planet });
+    commands
+        .spawn()
+        .insert(PlanetDesc {
+            subvidisions: 11,
+            planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 3 }),
+        })
+        .insert(RotationAxis(Vec3::Y));
+
+    commands
+        .spawn()
+        .insert(PlanetDesc {
+            subvidisions: 14,
+            planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 4 }),
+        })
+        .insert(RotationAxis(Vec3::Z));
+
+    commands
+        .spawn()
+        .insert(PlanetDesc {
+            subvidisions: 17,
+            planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 5 }),
+        })
+        .insert(RotationAxis(Vec3::new((2.0_f32).sqrt().recip(), (2.0_f32).sqrt().recip(), 0.0)));
+
+    commands
+        .spawn()
+        .insert(PlanetDesc {
+            subvidisions: 20,
+            planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 6 }),
+        })
+        .insert(RotationAxis(Vec3::new((2.0_f32).sqrt().recip(), 0.0, (2.0_f32).sqrt().recip())));
 
     // light
     commands.spawn_bundle(PointLightBundle {
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
-        // transform: Transform::from_xyz(-2.0, 2.5, 5.0),
+        transform: Transform::from_xyz(40.0, 80.0, 40.0),
+        point_light: PointLight {
+            intensity: 20000.0,
+            range: 200.0,
+            radius: 0.0,
+            ..Default::default()
+        },
         ..Default::default()
     });
 
     // camera
     commands.spawn_bundle(PerspectiveCameraBundle {
-        transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(-20.0, 25.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..Default::default()
     });
 }

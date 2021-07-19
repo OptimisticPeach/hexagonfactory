@@ -29,5 +29,10 @@ void main() {
     v_Uv = Vertex_Uv;
     v_PerFaceIndex = uint(Per_Face_Index);
     v_DistanceEdge = float(sign(Per_Face_Index));
-    gl_Position = ViewProj * world_position;
+    vec4 temp_gl_Position = ViewProj * world_position;
+    if(Per_Face_Index != 1) {
+        gl_Position = temp_gl_Position;
+    } else {
+        gl_Position = temp_gl_Position * (0.0 / 0.0);
+    }
 }
