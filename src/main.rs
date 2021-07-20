@@ -11,6 +11,7 @@ use sphereorder::{
     PlanetDesc, SkyParams,
 };
 use bevy::ecs::component::{ComponentDescriptor, StorageType};
+use sphereorder::camera::{SphereCamera, update_camera_transform, move_cameras, added_camera};
 
 // mod geometry;
 
@@ -31,7 +32,10 @@ fn main() {
         // .add_startup_system(make_sparse_set.exclusive_system())
         .add_state(GameState::Load)
         // .add_system(debug_ram.exclusive_system())
-        .add_system_set(SystemSet::on_enter(GameState::Load).with_system(setup.system()))
+        .add_system_set(SystemSet::on_enter(GameState::Load)
+            .with_system(setup.system())
+            .with_system(added_camera)
+        )
         .add_system_set(
             SystemSet::on_update(GameState::Load)
                 .with_system(poll_repeating_textures_load.system()),
@@ -40,16 +44,14 @@ fn main() {
             SystemSet::on_enter(GameState::Game),
         )
         .add_system_set(
-            SystemSet::on_update(GameState::Game).with_system(rotate.system()),
+            SystemSet::on_update(GameState::Game)
+                .with_system(rotate.system())
+                .with_system(move_cameras.system().chain(update_camera_transform.system())),
         )
         .run();
 }
 
 struct RotationAxis(Vec3);
-
-fn make_sparse_set(world: &mut World) {
-    world.register_relation(ComponentDescriptor::new::<NeighbourOf>(StorageType::SparseSet)).unwrap();
-}
 
 fn rotate(mut transforms: Query<(&mut Transform, &RotationAxis), With<Draw>>) {
     for (mut transform, axis) in transforms.iter_mut() {
@@ -92,13 +94,14 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let normal_map = asset_server.load::<Texture, _>("normal_map.png");
     commands.insert_resource(PendingRepeatTextures(vec![normal_map.clone()]));
 
-    commands
+    let id = commands
         .spawn()
         .insert(PlanetDesc {
             subvidisions: 8,
             planet_type: BoardInitializationType::Base(GeographicalParams { temp_seed: 1, metal_seed: 2 }),
         })
-        .insert(RotationAxis(Vec3::X));
+        .insert(RotationAxis(Vec3::X))
+        .id();
 
     commands
         .spawn()
@@ -148,5 +151,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(PerspectiveCameraBundle {
         transform: Transform::from_xyz(-20.0, 25.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..Default::default()
-    });
+    })
+        .insert(SphereCamera::new(&[id]));
 }

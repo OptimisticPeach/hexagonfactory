@@ -14,6 +14,7 @@ use rand::Rng;
 
 mod biome;
 pub mod board_ops;
+pub mod camera;
 
 use bevy::prelude::BuildChildren;
 pub use biome::Biome;
