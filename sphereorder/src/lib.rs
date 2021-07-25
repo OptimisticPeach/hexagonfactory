@@ -374,13 +374,13 @@ impl BoardBuilder {
             entities.push(entity);
         }
 
-        for (edge_a, edge_b) in unordered_edges {
-            let a = *old_center_to_node.get(&edge_a).unwrap();
-            let b = *old_center_to_node.get(&edge_b).unwrap();
-            commands.entity(a).insert_relation(NeighbourOf, b);
-
-            commands.entity(b).insert_relation(NeighbourOf, a);
-        }
+        // for (edge_a, edge_b) in unordered_edges {
+        //     let a = *old_center_to_node.get(&edge_a).unwrap();
+        //     let b = *old_center_to_node.get(&edge_b).unwrap();
+        //     commands.entity(a).insert_relation(NeighbourOf, b);
+        //
+        //     commands.entity(b).insert_relation(NeighbourOf, a);
+        // }
 
         let (biomes, hmap, per_face_data) = self.state.make_biomes(&mid_points);
 
