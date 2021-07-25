@@ -22,7 +22,7 @@ arrayvec = "0.7.0"
 shaders = { path = "./shaders" }
 rand = "0.8.3"
 sphereorder = { path = "./sphereorder" }
-bevy-inspector-egui = { path = "../bevy-inspector-egui" }
+#bevy-inspector-egui = { path = "../bevy-inspector-egui" }
 
 [patch.'https://github.com/bevyengine/bevy']
 bevy = { path = "../bevy" }

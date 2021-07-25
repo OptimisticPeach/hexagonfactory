@@ -12,7 +12,7 @@ use sphereorder::{
 };
 use bevy::ecs::component::{ComponentDescriptor, StorageType};
 use sphereorder::camera::{SphereCamera, update_camera_transform, move_cameras, added_camera, CameraDebugPoint, DebugPoint, CameraSpeedConfig};
-use bevy_inspector_egui::InspectorPlugin;
+// use bevy_inspector_egui::InspectorPlugin;
 
 // mod geometry;
 
@@ -29,7 +29,7 @@ fn main() {
         .add_plugin(LowPolyPBRPlugin)
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin)
-        .add_plugin(InspectorPlugin::<CameraSpeedConfig>::new())
+        // .add_plugin(InspectorPlugin::<CameraSpeedConfig>::new())
         .insert_resource(CameraSpeedConfig::default())
         .add_plugin(sphereorder::BoardPlugin)
         // .add_startup_system(make_sparse_set.exclusive_system())

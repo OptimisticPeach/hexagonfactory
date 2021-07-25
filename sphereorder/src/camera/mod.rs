@@ -10,7 +10,7 @@ use bevy::input::Input;
 use bevy::input::mouse::{MouseButton, MouseMotion, MouseWheel};
 use bevy::ecs::event::EventReader;
 use bevy::ecs::prelude::With;
-use bevy_inspector_egui::Inspectable;
+// use bevy_inspector_egui::Inspectable;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct CameraDebugPoint;
@@ -18,15 +18,16 @@ pub struct CameraDebugPoint;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DebugPoint(pub Entity);
 
-#[derive(Copy, Clone, Debug, PartialEq, Inspectable)]
+// #[derive(Copy, Clone, Debug, PartialEq, Inspectable)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct CameraSpeedConfig {
-    #[inspectable(min = 0.0, max = 0.2)]
+    // #[inspectable(min = 0.0, max = 0.2)]
     pub vertical_max: f32,
-    #[inspectable(min = 0.0, max = 0.2)]
+    // #[inspectable(min = 0.0, max = 0.2)]
     pub lateral_max: f32,
-    #[inspectable(min = 3.0, max = 4.0)]
+    // #[inspectable(min = 3.0, max = 4.0)]
     pub logarithm_base: f32,
-    #[inspectable(min = 150.0, max = 4000.0)]
+    // #[inspectable(min = 150.0, max = 4000.0)]
     pub total_scale: f32,
 }
 
