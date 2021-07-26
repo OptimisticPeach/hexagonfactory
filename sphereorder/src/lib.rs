@@ -20,7 +20,6 @@ use bevy::prelude::BuildChildren;
 pub use biome::Biome;
 pub use board_ops::BoardPlugin;
 use std::ops::Range;
-use bevy::ecs::prelude::ResMut;
 use bevy::asset::Assets;
 
 pub struct NeighbourOf;

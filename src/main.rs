@@ -1,11 +1,8 @@
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 
-use arrayvec::ArrayVec;
 use bevy::asset::LoadState;
-use bevy::render::mesh::Indices;
-use rand::{thread_rng, Rng};
-use shaders::{LowPolyMaterial, LowPolyPBRBundle, LowPolyPBRPlugin};
+use shaders::LowPolyPBRPlugin;
 use sphereorder::{
     BoardInitializationType, FaceMaterialIdx, GeographicalParams, NeighbourOf, OldFaceMaterialIdx,
     PlanetDesc, SkyParams,
@@ -13,8 +10,6 @@ use sphereorder::{
 use bevy::ecs::component::{ComponentDescriptor, StorageType};
 use sphereorder::camera::{SphereCamera, update_camera_transform, move_cameras, added_camera, CameraDebugPoint, DebugPoint, CameraSpeedConfig};
 // use bevy_inspector_egui::InspectorPlugin;
-
-// mod geometry;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 pub enum GameState {
@@ -49,7 +44,7 @@ fn main() {
             SystemSet::on_update(GameState::Game)
                 .with_system(added_camera)
                 // .with_system(rotate.system())
-                .with_system(move_cameras.system().chain(update_camera_transform.system())),
+                .with_system(move_cameras.chain(update_camera_transform)),
         )
         .run();
 }
@@ -102,22 +97,53 @@ fn setup(
     let normal_map = asset_server.load::<Texture, _>("normal_map.png");
     commands.insert_resource(PendingRepeatTextures(vec![normal_map.clone()]));
 
-    let id = commands
-        .spawn()
-        .insert(PlanetDesc {
-            subvidisions: 8,
-            planet_type: BoardInitializationType::Base(GeographicalParams { temp_seed: 1, metal_seed: 2 }),
-        })
-        .insert(RotationAxis(Vec3::X))
-        .id();
+    let ids = [
+        commands
+            .spawn()
+            .insert(PlanetDesc {
+                subvidisions: 13,
+                planet_type: BoardInitializationType::Base(GeographicalParams { temp_seed: 1, metal_seed: 2 }),
+            })
+            .insert(RotationAxis(Vec3::X))
+            .id(),
 
-    commands
-        .spawn()
-        .insert(PlanetDesc {
-            subvidisions: 11,
-            planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 3 }),
-        })
-        .insert(RotationAxis(Vec3::Y));
+        commands
+            .spawn()
+            .insert(PlanetDesc {
+                subvidisions: 18,
+                planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 3 }),
+            })
+            .insert(RotationAxis(Vec3::Y))
+            .id(),
+
+        commands
+            .spawn()
+            .insert(PlanetDesc {
+                subvidisions: 23,
+                planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 4 }),
+            })
+            .insert(RotationAxis(Vec3::Z))
+            .id(),
+
+        commands
+            .spawn()
+            .insert(PlanetDesc {
+                subvidisions: 28,
+                planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 5 }),
+            })
+            .insert(RotationAxis(Vec3::new((2.0_f32).sqrt().recip(), (2.0_f32).sqrt().recip(), 0.0)))
+            .id(),
+
+        commands
+            .spawn()
+            .insert(PlanetDesc {
+                subvidisions: 33,
+                planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 6 }),
+            })
+            .insert(RotationAxis(Vec3::new((2.0_f32).sqrt().recip(), 0.0, (2.0_f32).sqrt().recip())))
+            .id(),
+    ];
+
 
     let debug_point = commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Icosphere { subdivisions: 5, radius: 1.0 })),
@@ -127,30 +153,6 @@ fn setup(
     })
         .insert(CameraDebugPoint)
         .id();
-
-    commands
-        .spawn()
-        .insert(PlanetDesc {
-            subvidisions: 14,
-            planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 4 }),
-        })
-        .insert(RotationAxis(Vec3::Z));
-
-    commands
-        .spawn()
-        .insert(PlanetDesc {
-            subvidisions: 17,
-            planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 5 }),
-        })
-        .insert(RotationAxis(Vec3::new((2.0_f32).sqrt().recip(), (2.0_f32).sqrt().recip(), 0.0)));
-
-    commands
-        .spawn()
-        .insert(PlanetDesc {
-            subvidisions: 20,
-            planet_type: BoardInitializationType::Sky(SkyParams { land_seed: 6 }),
-        })
-        .insert(RotationAxis(Vec3::new((2.0_f32).sqrt().recip(), 0.0, (2.0_f32).sqrt().recip())));
 
     // light
     commands.spawn_bundle(PointLightBundle {
@@ -169,6 +171,6 @@ fn setup(
         transform: Transform::from_xyz(-20.0, 25.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..Default::default()
     })
-        .insert(SphereCamera::new(&[id]))
+        .insert(SphereCamera::new(&ids))
         .insert(DebugPoint(debug_point));
 }
