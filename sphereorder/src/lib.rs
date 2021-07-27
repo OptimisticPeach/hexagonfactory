@@ -21,8 +21,28 @@ pub use biome::Biome;
 pub use board_ops::BoardPlugin;
 use std::ops::Range;
 use bevy::asset::Assets;
+use std::hash::{Hash, Hasher};
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct NeighbourOf;
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct PackedRelations {
+    relations: HashMap<RelationPair, NeighbourOf>
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RelationPair(pub Entity, pub Entity);
+
+impl Hash for RelationPair {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        if self.0 > self.1 {
+            (self.0, self.1).hash(state);
+        } else {
+            (self.1, self.0).hash(state);
+        }
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PlanetDesc {
@@ -196,16 +216,16 @@ fn add_chunk_triangle_indices(
     a: u32,
     b: u32,
     c: u32,
-    unordered_edges: &mut HashSet<(u32, u32)>,
+    unordered_edges: &mut HashMap<(u32, u32), NeighbourOf>,
     original_points: &[Vec3A],
     new_points: &mut Vec<Vec3A>,
     per_face_indices: &mut Vec<i32>,
     surrounding_points: &mut HashMap<u32, ArrayVec<SurroundingEntry, 6>>,
 ) {
     unordered_edges.extend(std::array::IntoIter::new([
-        (a.min(b), a.max(b)),
-        (b.min(c), b.max(c)),
-        (c.min(a), c.max(a)),
+        ((a.min(b), a.max(b)), NeighbourOf),
+        ((b.min(c), b.max(c)), NeighbourOf),
+        ((c.min(a), c.max(a)), NeighbourOf),
     ]));
 
     let avg =
@@ -296,7 +316,7 @@ impl BoardBuilder {
         // Graph Edge creation stuff:
         //
         // Edges from center id to center id.
-        let mut unordered_edges = HashSet::default();
+        let mut unordered_edges = HashMap::default();
         // Center id to node index.
         let mut old_center_to_node = HashMap::default();
 
@@ -373,13 +393,17 @@ impl BoardBuilder {
             entities.push(entity);
         }
 
-        // for (edge_a, edge_b) in unordered_edges {
-        //     let a = *old_center_to_node.get(&edge_a).unwrap();
-        //     let b = *old_center_to_node.get(&edge_b).unwrap();
-        //     commands.entity(a).insert_relation(NeighbourOf, b);
-        //
-        //     commands.entity(b).insert_relation(NeighbourOf, a);
-        // }
+        let packed_relations = PackedRelations {
+            relations: unordered_edges
+                .into_iter()
+                .map(|((edge_a, edge_b), relation_data)| {
+                    let a = *old_center_to_node.get(&edge_a).unwrap();
+                    let b = *old_center_to_node.get(&edge_b).unwrap();
+
+                    (RelationPair(a, b), relation_data)
+                })
+                .collect()
+        };
 
         let (biomes, hmap, per_face_data) = self.state.make_biomes(&mid_points);
 
@@ -449,6 +473,7 @@ impl BoardBuilder {
 
         commands
             .entity(board)
+            //TODO: https://github.com/OptimisticPeach/hexagonfactory/issues/2
             .push_children(&entities)
             .insert_bundle(LowPolyPBRBundle {
                 mesh: meshes.add(mesh),
@@ -459,6 +484,7 @@ impl BoardBuilder {
                 }),
                 transform: Transform::from_scale(Vec3::splat(scale_factor)),
                 ..Default::default()
-            });
+            })
+            .insert(packed_relations);
     }
 }

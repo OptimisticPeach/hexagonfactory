@@ -1,4 +1,3 @@
-use smallvec::SmallVec;
 use bevy::ecs::entity::Entity;
 use bevy::math::{Vec3, Quat, Vec2};
 use bevy::ecs::query::{Without, Added, Changed};
@@ -16,11 +15,11 @@ use crate::board_ops::Layers;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LayerChangeEvent {
-    parent_planet: Entity,
-    old_shell: Entity,
-    old: usize,
-    new_shell: Entity,
-    new: usize,
+    pub parent_planet: Entity,
+    pub old_shell: Entity,
+    pub old: usize,
+    pub new_shell: Entity,
+    pub new: usize,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -173,7 +172,6 @@ pub fn move_cameras(
             *camera_target = None;
         } else {
             let add_scale = time * speed_config.scale_per_second * delta_scale.signum();
-            println!("Add scale: {}", add_scale);
             let add_dist = target.distance_per_second * time;
 
             camera.scale = target.original_scale + add_scale;
@@ -212,7 +210,6 @@ pub fn move_cameras(
     match &mut *camera_target {
         Some(old) => {
             let old_target_layer = old.target_layer;
-            println!("Migrating target change: Current: {}, Old: {}, New: {}", camera.target_layer, old_target_layer, new_target);
 
             *old = TargetSphereCamera {
                 original_scale: camera.scale,

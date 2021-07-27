@@ -55,11 +55,6 @@ impl<Q: AsRef<[Entity]>> From<Q> for Layers {
     }
 }
 
-pub enum OpState {
-    Pending,
-    Finished,
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LayerLoadState {
     LoadUnload,
@@ -69,18 +64,22 @@ pub enum LayerLoadState {
 impl Plugin for BoardPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_system(changed_tiletype::update_material_idx_system)
-            .add_system(Self::add_new_planets);
-            // .add_system_set(
-            //     SystemSet::on_update(LayerLoadState::LoadUnload)
-            //         .with_system(load::loader::<5>)
-            //         .with_system(unload::unloader::<5>)
-            // )
-            // .add_system_set(
-            //     SystemSet::on_exit(LayerLoadState::LoadUnload)
-            //         .with_system(load::load_all)
-            //         .with_system(unload::unload_all)
-            // )
-            // .add_system(Self::layer_event_watcher);
+            .add_system(Self::add_new_planets)
+            .add_state(LayerLoadState::Finished)
+            .insert_resource(LoadState(None))
+            .insert_resource(UnloadState(Default::default()))
+            .add_system_set(
+                SystemSet::on_update(LayerLoadState::LoadUnload)
+                    // .with_system(load::loader::<5>)
+                    // .with_system(unload::unloader::<5>)
+                    .with_system(Self::layer_state_resetter)
+            )
+            .add_system_set(
+                SystemSet::on_exit(LayerLoadState::LoadUnload)
+                    // .with_system(load::load_all)
+                    // .with_system(unload::unload_all)
+            )
+            .add_system(Self::layer_event_watcher);
     }
 }
 
@@ -101,16 +100,32 @@ impl BoardPlugin {
         }
     }
 
-    // fn layer_event_watcher(
-    //     mut events: EventReader<LayerChangeEvent>,
-    //     mut state: ResMut<State<LayerLoadState>>,
-    //     mut load: ResMut<LoadState>,
-    //     mut unload: ResMut<UnloadState>,
-    // ) {
-    //     if let Some(event) = events.iter().next() {
-    //
-    //     }
-    //
-    //
-    // }
+    fn layer_event_watcher(
+        mut events: EventReader<LayerChangeEvent>,
+        mut state: ResMut<State<LayerLoadState>>,
+        mut load: ResMut<LoadState>,
+        mut unload: ResMut<UnloadState>,
+    ) {
+        for event in events.iter() {
+            load
+                .0
+                .replace(event.new_shell)
+                .into_iter()
+                .for_each(|to_unload| unload.0.push(to_unload));
+
+            if let LayerLoadState::Finished = state.current() {
+                state.set(LayerLoadState::LoadUnload).unwrap();
+            }
+        }
+    }
+
+    fn layer_state_resetter(
+        load: ResMut<LoadState>,
+        unload: ResMut<UnloadState>,
+        mut state: ResMut<State<LayerLoadState>>,
+    ) {
+        if load.0.is_none() && unload.0.is_empty() {
+            state.set(LayerLoadState::Finished).unwrap();
+        }
+    }
 }
