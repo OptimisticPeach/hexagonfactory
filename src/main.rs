@@ -8,7 +8,8 @@ use sphereorder::{
     PlanetDesc, SkyParams,
 };
 use bevy::ecs::component::{ComponentDescriptor, StorageType};
-use sphereorder::camera::{SphereCamera, update_camera_transform, move_cameras, added_camera, CameraDebugPoint, DebugPoint, CameraSpeedConfig};
+use sphereorder::camera::{SphereCamera, update_camera_transform, move_cameras, added_camera, CameraDebugPoint, DebugPoint, CameraSpeedConfig, LayerChangeEvent};
+use sphereorder::board_ops::Layers;
 // use bevy_inspector_egui::InspectorPlugin;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
@@ -24,6 +25,7 @@ fn main() {
         .add_plugin(LowPolyPBRPlugin)
         .add_plugin(LogDiagnosticsPlugin::default())
         .add_plugin(FrameTimeDiagnosticsPlugin)
+        .add_event::<LayerChangeEvent>()
         // .add_plugin(InspectorPlugin::<CameraSpeedConfig>::new())
         .insert_resource(CameraSpeedConfig::default())
         .add_plugin(sphereorder::BoardPlugin)
@@ -144,6 +146,16 @@ fn setup(
             .id(),
     ];
 
+    let parent_planet = commands
+        .spawn()
+        .insert_bundle(
+            (
+                Layers::from(&ids),
+                Transform::default(),
+                GlobalTransform::default(),
+            )
+        )
+        .id();
 
     let debug_point = commands.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Icosphere { subdivisions: 5, radius: 1.0 })),
@@ -171,6 +183,6 @@ fn setup(
         transform: Transform::from_xyz(-20.0, 25.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..Default::default()
     })
-        .insert(SphereCamera::new(&ids))
+        .insert(SphereCamera::new(parent_planet))
         .insert(DebugPoint(debug_point));
 }

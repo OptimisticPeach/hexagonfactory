@@ -10,7 +10,18 @@ use bevy::ecs::event::EventReader;
 use bevy::ecs::prelude::With;
 use bevy_utils::Instant;
 use bevy::prelude::KeyCode;
+use bevy::app::EventWriter;
+use crate::board_ops::Layers;
 // use bevy_inspector_egui::Inspectable;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct LayerChangeEvent {
+    parent_planet: Entity,
+    old_shell: Entity,
+    old: usize,
+    new_shell: Entity,
+    new: usize,
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct CameraDebugPoint;
@@ -48,7 +59,7 @@ impl Default for CameraSpeedConfig {
 pub struct SphereCamera {
     vector_of_interest: Quat,
     from_target_angle: (f32, f32),
-    layers: SmallVec<[Entity; 5]>,
+    layered_planet: Entity,
     pivot_speed: Option<(f32, f32)>,
     target_layer: usize,
     scale: f32,
@@ -69,12 +80,11 @@ pub struct TargetSphereCamera {
 }
 
 impl SphereCamera {
-    pub fn new(entities: &[Entity]) -> Self {
-        assert!(entities.len() > 0);
+    pub fn new(layered: Entity) -> Self {
         SphereCamera {
             vector_of_interest: Quat::IDENTITY,
             from_target_angle: (0.001, 0.001),
-            layers: entities.iter().copied().collect(),
+            layered_planet: layered,
             target_layer: 0,
             scale: 10.0,
             distance: 0.1,
@@ -85,12 +95,14 @@ impl SphereCamera {
 
 pub fn move_cameras(
     mut cameras: Query<(&mut SphereCamera, &mut Option<TargetSphereCamera>)>,
+    planet_layers: Query<&Layers>,
     mouse_button_input: Res<Input<MouseButton>>,
     mut mouse_motion_events: EventReader<MouseMotion>,
     mut mouse_wheel_events: EventReader<MouseWheel>,
     speed_config: Res<CameraSpeedConfig>,
     keyboard: Res<Input<KeyCode>>,
     transforms: Query<&Transform>,
+    mut events: EventWriter<LayerChangeEvent>,
 ) {
     // Mouse motion total
     let total = mouse_motion_events
@@ -182,17 +194,18 @@ pub fn move_cameras(
 
     let new_target = (effective_layer as isize + layers_changed) as usize;
 
-    if new_target == camera.layers.len() {
+    let layers = planet_layers.get(camera.layered_planet).unwrap();
+
+    if new_target == layers.len() {
         return;
     }
 
-    let new_max = camera
-        .layers
+    let new_max = layers
         .get(new_target + 1)
         .map(|&x| transforms.get(x).unwrap().scale.x - 0.1)
         .unwrap_or(f32::INFINITY);
 
-    let new_scl = transforms.get(camera.layers[new_target]).unwrap().scale.x;
+    let new_scl = transforms.get(layers[new_target]).unwrap().scale.x;
 
     let new_dst = new_max - new_scl;
 
@@ -216,6 +229,14 @@ pub fn move_cameras(
             let total_time = delta_scale / speed_config.scale_per_second;
 
             old.distance_per_second = (old.target_distance - old.original_distance) / total_time.abs();
+            events
+                .send(LayerChangeEvent {
+                    parent_planet: camera.layered_planet,
+                    old_shell: layers[old.original_layer],
+                    old: old.original_layer,
+                    new_shell: layers[new_target],
+                    new: new_target,
+                });
         },
         None => {
             let mut new = TargetSphereCamera {
@@ -234,6 +255,15 @@ pub fn move_cameras(
 
             new.distance_per_second = (new.target_distance - new.original_distance) / total_time.abs();
             *camera_target = Some(new);
+
+            events
+                .send(LayerChangeEvent {
+                    parent_planet: camera.layered_planet,
+                    old_shell: layers[camera.target_layer],
+                    old: camera.target_layer,
+                    new_shell: layers[new_target],
+                    new: new_target,
+                });
         }
     }
 }
@@ -255,7 +285,7 @@ pub fn update_camera_transform(
         ).mul_vec3(Vec3::Y);
         let up = (-camera_delta).cross(target_vector).cross(-camera_delta).normalize();
 
-        let planet_delta = transforms.get(camera.layers[camera.target_layer]).unwrap().translation;
+        let planet_delta = transforms.get(camera.layered_planet).unwrap().translation;
         
         *transform = Transform::from_translation(
             planet_delta + target_vector * camera.scale + camera_delta * camera.distance
@@ -265,13 +295,14 @@ pub fn update_camera_transform(
 
 pub fn added_camera(
     mut cameras: Query<(Entity, &mut SphereCamera), Added<SphereCamera>>,
+    layers: Query<&Layers>,
     transforms: Query<&Transform>,
     mut commands: Commands,
 ) {
     cameras
         .iter_mut()
         .for_each(move |(entity, mut x)| {
-            x.scale = transforms.get(x.layers[x.target_layer]).unwrap().scale.x;
+            x.scale = transforms.get(layers.get(x.layered_planet).unwrap()[x.target_layer]).unwrap().scale.x;
             commands
                 .entity(entity)
                 .insert(None::<TargetSphereCamera>);
