@@ -66,17 +66,17 @@ impl Plugin for BoardPlugin {
         app.add_system(changed_tiletype::update_material_idx_system)
             .add_system(Self::add_new_planets)
             .add_state(LayerLoadState::Finished)
-            .insert_resource(LoadState(None))
+            .insert_resource(LoadState(None, None))
             .insert_resource(UnloadState(Default::default()))
             .add_system_set(
                 SystemSet::on_update(LayerLoadState::LoadUnload)
-                    // .with_system(load::loader::<5>)
+                    .with_system(load::loader::<5>)
                     // .with_system(unload::unloader::<5>)
                     .with_system(Self::layer_state_resetter)
             )
             .add_system_set(
                 SystemSet::on_exit(LayerLoadState::LoadUnload)
-                    // .with_system(load::load_all)
+                    .with_system(load::load_all)
                     // .with_system(unload::unload_all)
             )
             .add_system(Self::layer_event_watcher);
@@ -112,6 +112,8 @@ impl BoardPlugin {
                 .replace(event.new_shell)
                 .into_iter()
                 .for_each(|to_unload| unload.0.push(to_unload));
+
+            load.1 = None;
 
             if let LayerLoadState::Finished = state.current() {
                 state.set(LayerLoadState::LoadUnload).unwrap();
